@@ -1,5 +1,6 @@
 const { Reader, Writer } = require('oer-utils')
 const base64url = require('base64url')
+const uuidParse = require('uuid-parse')
 
 const TYPE_ACK = 1
 const TYPE_RESPONSE = 2
@@ -122,18 +123,18 @@ function deserializeCustomResponse (buffer) {
 
 function serializePrepare ({ id, amount, executionCondition, expiresAt, ilp }, requestId, sideData) {
   const idBuffer = Buffer.from(id.replace(/\-/g, ''), 'hex')
-  const amountAsPair = stringToTwoNumbers(amount)
+  const amountAsPair = [ 0x00000000, +amount ]
   const executionConditionBuffer = Buffer.from(executionCondition, 'base64')
-  const expiresAtBuffer = Buffer.from() // TODO: how to write a timestamp
+  const expiresAtBuffer = Buffer.from('') // TODO: how to write a timestamp
   const packet = Buffer.from(ilp, 'base64')
   const writer = new Writer()
 
-  writer.writeUInt128(idBuffer)
+  writer.write(idBuffer)
   writer.writeUInt64(amountAsPair)
-  writer.writeUInt256(executionConditionBuffer)
+  writer.write(executionConditionBuffer)
   writer.writeVarOctetString(expiresAtBuffer)
   writer.write(packet)
-  writeSideData(sideData)
+  writeSideData(writer, sideData)
 
   return writeEnvelope(TYPE_PREPARE, requestId, writer.getBuffer())
 }
@@ -142,10 +143,10 @@ function deserializePrepare (buffer) {
   const { type, requestId, contents } = readEnvelope(buffer)
   const reader = new Reader(contents)
 
-  const id = reader.readUInt128()
-  const amount = twoNumbersToString(reader.readUInt64())
-  const executionCondition = base64url(reader.readUInt256())
-  const expiresAt = Buffer.from() // TODO: how to read a timestamp
+  const id = uuidParse.unparse(reader.read(16))
+  const amount = reader.readUInt64()[1] + ''
+  const executionCondition = base64url(reader.read(32))
+  const expiresAt = reader.readUInt8() // TODO: how to read a timestamp
   const ilp = readIlpPacket(reader)
   const sideData = readSideData(reader)
 
@@ -157,9 +158,9 @@ function serializeFulfill ({ id, fulfillment }, requestId, sideData) {
   const fulfillmentBuffer = Buffer.from(fulfillment, 'base64')
   const writer = new Writer()
 
-  writer.writeUInt128(idBuffer)
-  writer.writeUInt256(fulfillmentBuffer)
-  writeSideData(sideData)
+  writer.write(idBuffer)
+  writer.write(fulfillmentBuffer)
+  writeSideData(writer, sideData)
 
   return writeEnvelope(TYPE_FULFILL, requestId, writer.getBuffer())
 }
@@ -168,8 +169,8 @@ function deserializeFulfill (buffer) {
   const { type, requestId, contents } = readEnvelope(buffer)
   const reader = new Reader(contents)
 
-  const id = reader.readUInt128()
-  const fulfillment = base64url(reader.readUInt256()) 
+  const id = uuidParse.unparse(reader.read(16))
+  const fulfillment = base64url(reader.read(32)) 
   const sideData = readSideData(reader)
 
   return { requestId, id, fulfillment, sideData }
@@ -180,9 +181,9 @@ function serializeReject ({ id, reason }, requestId, sideData) {
   const reasonBuffer = Buffer.from(reason, 'base64')
   const writer = new Writer()
 
-  writer.writeUInt128(idBuffer)
+  writer.write(idBuffer)
   writer.write(reasonBuffer)
-  writeSideData(sideData)
+  writeSideData(writer, sideData)
 
   return writeEnvelope(TYPE_REJECT, requestId, writer.getBuffer())
 }
@@ -191,14 +192,15 @@ function deserializeReject (buffer) {
   const { type, requestId, contents } = readEnvelope(buffer)
   const reader = new Reader(contents)
 
-  const id = reader.readUInt128()
+  const id = uuidParse.unparse(reader.read(16))
   const reason = readIlpPacket(reader) 
   const sideData = readSideData(reader)
 
-  return { requestId, id, fulfillment, sideData }
+  return { requestId, id, reason, sideData }
 }
 
 function serializeMessage ({ ilp }, requestId, sideData) {
+  const packet = Buffer.from(ilp, 'base64')
   const writer = new Writer()
 
   writer.write(packet)
