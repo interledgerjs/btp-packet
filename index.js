@@ -224,3 +224,32 @@ function deserializeCustomRequest (buffer) {
   const sideData = readSideData(reader)
   return { requestId, sideData }
 }
+
+module.exports = {
+  TYPE_ACK,
+  TYPE_RESPONSE,
+  TYPE_CUSTOM_RESPONSE,
+  TYPE_PREPARE,
+  TYPE_FULFILL,
+  TYPE_REJECT,
+  TYPE_MESSAGE,
+  TYPE_CUSTOM_REQUEST,
+
+  serializeAck,
+  serializeResponse,
+  serializeCustomResponse,
+  serializePrepare,
+  serializeFulfill,
+  serializeReject,
+  serializeMessage,
+  serializeCustomRequest,
+
+  deserializeAck,
+  deserializeResponse,
+  deserializeCustomResponse,
+  deserializePrepare,
+  deserializeFulfill,
+  deserializeReject,
+  deserializeMessage,
+  deserializeCustomRequest
+}
