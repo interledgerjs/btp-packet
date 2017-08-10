@@ -2,6 +2,7 @@ const { Reader, Writer } = require('oer-utils')
 const base64url = require('base64url')
 const uuidParse = require('uuid-parse')
 const dateFormat = require('dateformat')
+const BigNumber = require('bignumber.js')
 
 const TYPE_ACK = 1
 const TYPE_RESPONSE = 2
@@ -11,8 +12,24 @@ const TYPE_FULFILL = 5
 const TYPE_REJECT = 6
 const TYPE_MESSAGE = 7
 const TYPE_CUSTOM_REQUEST = 8
+
+const HIGH_WORD_MULTIPLIER = 0x100000000
 const GENERALIZED_TIME_REGEX =
   /^([0-9]{4})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2}\.[0-9]{3}Z)$/
+
+function twoNumbersToString (num) {
+  const [ hi, lo ] = num
+  const uint64 = new BigNumber(hi).times(HIGH_WORD_MULTIPLIER).add(lo)
+  return uint64.toString(10)
+}
+
+function stringToTwoNumbers (num) {
+  const uint64 = new BigNumber(num)
+  return [
+    uint64.dividedToIntegerBy(HIGH_WORD_MULTIPLIER).toNumber(),
+    uint64.modulo(HIGH_WORD_MULTIPLIER).toNumber()
+  ]
+}
 
 function toGeneralizedTime (date) {
   return Buffer.from(dateFormat(date, "UTC:yyyymmddHHMMss.l'Z'"))
@@ -139,7 +156,7 @@ function deserializeCustomResponse (buffer) {
 
 function serializePrepare ({ id, amount, executionCondition, expiresAt, ilp }, requestId, sideData) {
   const idBuffer = Buffer.from(id.replace(/\-/g, ''), 'hex')
-  const amountAsPair = [ 0x00000000, +amount ]
+  const amountAsPair = stringToTwoNumbers(amount)
   const executionConditionBuffer = Buffer.from(executionCondition, 'base64')
   const expiresAtBuffer = toGeneralizedTime(expiresAt) // TODO: how to write a timestamp
   const packet = Buffer.from(ilp, 'base64')
@@ -160,7 +177,7 @@ function deserializePrepare (buffer) {
   const reader = new Reader(contents)
 
   const id = uuidParse.unparse(reader.read(16))
-  const amount = reader.readUInt64()[1] + ''
+  const amount = twoNumbersToString(reader.readUInt64())
   const executionCondition = base64url(reader.read(32))
   const expiresAt = readGeneralizedTime(reader) // TODO: how to read a timestamp
   const ilp = readIlpPacket(reader)

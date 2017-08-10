@@ -83,6 +83,18 @@ describe('Common Ledger Protocol', () => {
         sideData: this.sideData
       }, this.transfer))
     })
+
+    it('should serialize/deserialize 64-bit amount without losing precision', function () {
+      this.transfer.amount = '1234567890123'
+
+      const buf = Clp.serializePrepare(this.transfer, 1, this.sideData)
+      const res = Clp.deserializePrepare(buf)
+
+      assert.deepEqual(res, Object.assign({
+        requestId: 1,
+        sideData: this.sideData
+      }, this.transfer))
+    })
   })
 
   describe('Fufill', () => {
