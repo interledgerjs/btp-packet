@@ -21,7 +21,7 @@ describe('Common Ledger Protocol', () => {
       id: uuid(),
       amount: '1000',
       executionCondition: base64url(crypto.randomBytes(32)),
-      expiresAt: 0, // TODO
+      expiresAt: new Date(),
       ilp: this.ilpPacket
     }
 

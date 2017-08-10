@@ -1,6 +1,7 @@
 const { Reader, Writer } = require('oer-utils')
 const base64url = require('base64url')
 const uuidParse = require('uuid-parse')
+const dateFormat = require('dateformat')
 
 const TYPE_ACK = 1
 const TYPE_RESPONSE = 2
@@ -10,6 +11,21 @@ const TYPE_FULFILL = 5
 const TYPE_REJECT = 6
 const TYPE_MESSAGE = 7
 const TYPE_CUSTOM_REQUEST = 8
+const GENERALIZED_TIME_REGEX =
+  /^([0-9]{4})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2}\.[0-9]{3}Z)$/
+
+function toGeneralizedTime (date) {
+  return Buffer.from(dateFormat(date, "UTC:yyyymmddHHMMss.l'Z'"))
+}
+
+function readGeneralizedTime (reader) {
+  const generalizedTime = reader.readVarOctetString().toString()
+  const date = generalizedTime.replace(
+    GENERALIZED_TIME_REGEX,
+    '$1-$2-$3T$4:$5:$6')
+
+  return new Date(date)
+}
 
 function readIlpPacket (reader) {
   const type = Buffer.from([ reader.readUInt8() ])
@@ -125,7 +141,7 @@ function serializePrepare ({ id, amount, executionCondition, expiresAt, ilp }, r
   const idBuffer = Buffer.from(id.replace(/\-/g, ''), 'hex')
   const amountAsPair = [ 0x00000000, +amount ]
   const executionConditionBuffer = Buffer.from(executionCondition, 'base64')
-  const expiresAtBuffer = Buffer.from('') // TODO: how to write a timestamp
+  const expiresAtBuffer = toGeneralizedTime(expiresAt) // TODO: how to write a timestamp
   const packet = Buffer.from(ilp, 'base64')
   const writer = new Writer()
 
@@ -146,7 +162,7 @@ function deserializePrepare (buffer) {
   const id = uuidParse.unparse(reader.read(16))
   const amount = reader.readUInt64()[1] + ''
   const executionCondition = base64url(reader.read(32))
-  const expiresAt = reader.readUInt8() // TODO: how to read a timestamp
+  const expiresAt = readGeneralizedTime(reader) // TODO: how to read a timestamp
   const ilp = readIlpPacket(reader)
   const sideData = readSideData(reader)
 
