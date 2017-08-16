@@ -13,32 +13,50 @@ describe('Common Ledger Protocol', () => {
     })
 
     this.protocolData = [
-      { name: 'ilp', contentType: Clp.MIME_APPLICATION_OCTET_STREAM, data: this.ilpPacket },
-      { name: 'foo', contentType: Clp.MIME_APPLICATION_OCTET_STREAM, data: Buffer.from('bar') },
-      { name: 'beep', contentType: Clp.MIME_TEXT_PLAIN_UTF8, data: Buffer.from('boop') },
-      { name: 'json', contentType: Clp.MIME_APPLICATION_JSON, data: Buffer.from('{}') }
+      { protocolName: 'ilp', contentType: Clp.MIME_APPLICATION_OCTET_STREAM, data: this.ilpPacket },
+      { protocolName: 'foo', contentType: Clp.MIME_APPLICATION_OCTET_STREAM, data: Buffer.from('bar') },
+      { protocolName: 'beep', contentType: Clp.MIME_TEXT_PLAIN_UTF8, data: Buffer.from('boop') },
+      { protocolName: 'json', contentType: Clp.MIME_APPLICATION_JSON, data: Buffer.from('{}') }
     ]
 
     this.transfer = {
-      id: uuid(),
+      transferId: uuid(),
       amount: '1000',
       executionCondition: base64url(crypto.randomBytes(32)),
       expiresAt: new Date()
     }
 
     this.fulfill = {
-      id: uuid(),
+      transferId: this.transfer.transferId,
       fulfillment: base64url(crypto.randomBytes(32))
     }
 
     this.reject = {
-      id: uuid(),
-      reason: this.ilpPacket.toString('base64')
+      transferId: this.transfer.transferId,
+      rejectionReason: this.error
+    }
+
+    this.rejectBuf = {
+      transferId:  this.transfer.transferId,
+      rejectionReason: this.errorBuf
+    }
+
+    this.rejectStr = {
+      transferId: this.transfer.transferId,
+      rejectionReason: this.errorStr
     }
 
     this.error = {
-      ilp: this.ilpPacket.toString('base64')
+      code: 'L13',
+      name: 'errorName',
+      triggeredBy: 'peer.',
+      forwardedBy: ['die da', 'die da', 'die da'],
+      triggeredAt: new Date(),
+      data: 'boo'
     }
+    this.errorBuf = IlpPacket.serializeIlpError(this.error)
+    this.errorStr = this.errorBuf.toString('base64')
+
   })
 
   describe('Ack', () => {
@@ -67,13 +85,36 @@ describe('Common Ledger Protocol', () => {
 
   describe('Error', () => {
     it('should serialize/deserialize without losing data', function () {
-      const buf = Clp.serializeError(this.error, 1, this.protocolData)
+      const buf = Clp.serializeError({ rejectionReason: this.error }, 1, this.protocolData)
       const res = Clp.deserializeError(buf)
 
-      assert.deepEqual(res, Object.assign({
+      assert.deepEqual(res, {
         requestId: 1,
+        rejectionReason: this.error,
         protocolData: this.protocolData
-      }, this.error))
+      })
+    })
+
+    it('should serialize from buffer without losing data', function () {
+      const buf = Clp.serializeError({ rejectionReason: this.errorBuf }, 1, this.protocolData)
+      const res = Clp.deserializeError(buf)
+
+      assert.deepEqual(res, {
+        requestId: 1,
+        rejectionReason: this.error,
+        protocolData: this.protocolData
+      })
+    })
+
+    it('should serialize from string without losing data', function () {
+      const buf = Clp.serializeError({ rejectionReason: this.errorStr }, 1, this.protocolData)
+      const res = Clp.deserializeError(buf)
+
+      assert.deepEqual(res, {
+        requestId: 1,
+        rejectionReason: this.error,
+        protocolData: this.protocolData
+      })
     })
   })
 
@@ -120,6 +161,29 @@ describe('Common Ledger Protocol', () => {
 
       assert.deepEqual(res, Object.assign({
         requestId: 1,
+        rejectionReason: this.error,
+        protocolData: this.protocolData
+      }, this.reject))
+    })
+
+    it('should serialize from buffer without losing data', function () {
+      const buf = Clp.serializeReject(this.rejectBuf, 1, this.protocolData)
+      const res = Clp.deserializeReject(buf)
+
+      assert.deepEqual(res, Object.assign({
+        requestId: 1,
+        rejectionReason: this.error,
+        protocolData: this.protocolData
+      }, this.reject))
+    })
+
+    it('should serialize from string without losing data', function () {
+      const buf = Clp.serializeReject(this.rejectStr, 1, this.protocolData)
+      const res = Clp.deserializeReject(buf)
+
+      assert.deepEqual(res, Object.assign({
+        requestId: 1,
+        rejectionReason: this.error,
         protocolData: this.protocolData
       }, this.reject))
     })

@@ -3,6 +3,7 @@ const base64url = require('base64url')
 const uuidParse = require('uuid-parse')
 const dateFormat = require('dateformat')
 const BigNumber = require('bignumber.js')
+const { deserializeIlpError, serializeIlpError } = require('ilp-packet')
 
 const TYPE_ACK = 1
 const TYPE_RESPONSE = 2
@@ -19,6 +20,30 @@ const HIGH_WORD_MULTIPLIER = 0x100000000
 const GENERALIZED_TIME_REGEX =
   /^([0-9]{4})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2}\.[0-9]{3}Z)$/
 
+// Notes about variable naming - comparison with LedgerPluginInterface (IL-RFC-4):
+//
+// Message / Response / Error corresponds to sendRequest in the
+// LedgerPluginInterface, see:
+// https://interledger.org/rfcs/0004-ledger-plugin-interface/#sendrequest
+//
+// The requestId variable in Message corresponds to the 'id' field in the
+// Message class of the LedgerPluginInterface, see:
+// https://interledger.org/rfcs/0004-ledger-plugin-interface/#class-message
+// However, in CLP, all calls have a requestId, even though in LPI only
+// sendRequest does.
+//
+// Prepare / Fulfill / Reject correspond to
+// sendTransfer / fulfillCondition / rejectIncomingTransfer in the LPI.
+// The transferId variable in them corresponds to the 'id' field in the
+// Transfer class of the LedgerPluginInterface, see:
+// https://interledger.org/rfcs/0004-ledger-plugin-interface/#class-transfer
+//
+// Notes about variable naming - comparison with asn.1 definition:
+//
+// The term 'Envelope' here correspond to the
+// whole CommonLedgerProtocolPacket, see:
+// https://github.com/interledger/rfcs/blob/master/asn1/CommonLedgerProtocol.asn
+
 function twoNumbersToString (num) {
   const [ hi, lo ] = num
   const uint64 = new BigNumber(hi).times(HIGH_WORD_MULTIPLIER).add(lo)
@@ -33,7 +58,7 @@ function stringToTwoNumbers (num) {
   ]
 }
 
-function toGeneralizedTime (date) {
+function toGeneralizedTimeBuffer (date) {
   return Buffer.from(dateFormat(date, "UTC:yyyymmddHHMMss.l'Z'"))
 }
 
@@ -46,21 +71,31 @@ function readGeneralizedTime (reader) {
   return new Date(date)
 }
 
-function readIlpPacket (reader) {
+function maybeSerializeIlpError(error) {
+  if (Buffer.isBuffer(error)) {
+    return error
+  }
+  if (typeof error === 'string') {
+    return Buffer.from(error, 'base64')
+  }
+  return serializeIlpError(error)
+}
+
+// TODO: move this function to the ilp-packet module, so we don't
+// have to parse the same data twice.
+function readIlpError (reader) {
   const type = Buffer.from([ reader.readUInt8() ])
   reader.bookmark()
   const length = Buffer.from([ reader.readLengthPrefix() ])
   reader.restore()
   const contents = reader.readVarOctetString()
-
-  return base64url(Buffer.concat([ type, length, contents ]))
+  return deserializeIlpError(Buffer.concat([ type, length, contents ]))
 }
 
-function writeEnvelope (type, id, contents) {
+function writeEnvelope (type, requestId, contents) {
   const writer = new Writer()
-
   writer.writeUInt8(type)
-  writer.writeUInt32(id)
+  writer.writeUInt32(requestId)
   writer.writeVarOctetString(contents)
 
   return writer.getBuffer()
@@ -68,15 +103,15 @@ function writeEnvelope (type, id, contents) {
 
 function readEnvelope (envelope) {
   const reader = new Reader(envelope)
-  
+
   const type = reader.readUInt8()
   const requestId = reader.readUInt32()
-  const contents = reader.readVarOctetString()
+  const data = reader.readVarOctetString()
 
   return {
     type,
     requestId,
-    contents
+    data
   }
 }
 
@@ -89,7 +124,7 @@ function writeProtocolData (writer, protocolData) {
   writer.writeUInt(lengthPrefix, lengthPrefixLengthPrefix)
 
   for (const p of protocolData) {
-    writer.writeVarOctetString(Buffer.from(p.name, 'ascii'))
+    writer.writeVarOctetString(Buffer.from(p.protocolName, 'ascii'))
     writer.writeUInt8(p.contentType)
     writer.writeVarOctetString(p.data)
   }
@@ -97,15 +132,18 @@ function writeProtocolData (writer, protocolData) {
 
 function readProtocolData (reader) {
   const lengthPrefixPrefix = reader.readUInt8()
-  const lengthPrefix = reader.readUInt(lengthPrefixPrefix) 
+  const lengthPrefix = reader.readUInt(lengthPrefixPrefix)
   const protocolData = []
 
   for (let i = 0; i < lengthPrefix; ++i) {
-    const name = reader.readVarOctetString().toString('ascii')
+    const protocolName = reader.readVarOctetString().toString('ascii')
     const contentType = reader.readUInt8()
     const data = reader.readVarOctetString()
-
-    protocolData.push({ name, contentType, data })
+    protocolData.push({
+      protocolName,
+      contentType,
+      data
+    })
   }
 
   return protocolData
@@ -119,8 +157,8 @@ function serializeAck (requestId, protocolData) {
 }
 
 function deserializeAck (buffer) {
-  const { type, requestId, contents } = readEnvelope(buffer)
-  const reader = new Reader(contents)
+  const { type, requestId, data } = readEnvelope(buffer)
+  const reader = new Reader(data)
 
   const protocolData = readProtocolData(reader)
   return { requestId, protocolData }
@@ -134,40 +172,38 @@ function serializeResponse (requestId, protocolData) {
 }
 
 function deserializeResponse (buffer) {
-  const { type, requestId, contents } = readEnvelope(buffer)
-  const reader = new Reader(contents)
+  const { type, requestId, data } = readEnvelope(buffer)
+  const reader = new Reader(data)
 
   const protocolData = readProtocolData(reader)
   return { requestId, protocolData }
 }
 
-function serializeError ({ ilp }, requestId, protocolData) {
+function serializeError ({ rejectionReason }, requestId, protocolData) {
   const writer = new Writer()
-  const packet = Buffer.from(ilp, 'base64')
-
-  writer.write(packet)
+  const ilpPacket = maybeSerializeIlpError(rejectionReason)
+  writer.write(ilpPacket)
   writeProtocolData(writer, protocolData)
 
   return writeEnvelope(TYPE_ERROR, requestId, writer.getBuffer())
 }
 
 function deserializeError (buffer) {
-  const { type, requestId, contents } = readEnvelope(buffer)
-  const reader = new Reader(contents)
-
-  const ilp = readIlpPacket(reader)
+  const { type, requestId, data } = readEnvelope(buffer)
+  const reader = new Reader(data)
+  const rejectionReason = readIlpError(reader)
   const protocolData = readProtocolData(reader)
-  return { requestId, ilp, protocolData }
+  return { requestId, rejectionReason, protocolData }
 }
 
-function serializePrepare ({ id, amount, executionCondition, expiresAt }, requestId, protocolData) {
-  const idBuffer = Buffer.from(id.replace(/\-/g, ''), 'hex')
+function serializePrepare ({ transferId, amount, executionCondition, expiresAt }, requestId, protocolData) {
+  const transferIdBuffer = Buffer.from(transferId.replace(/\-/g, ''), 'hex')
   const amountAsPair = stringToTwoNumbers(amount)
   const executionConditionBuffer = Buffer.from(executionCondition, 'base64')
-  const expiresAtBuffer = toGeneralizedTime(expiresAt) // TODO: how to write a timestamp
+  const expiresAtBuffer = toGeneralizedTimeBuffer(expiresAt)
   const writer = new Writer()
 
-  writer.write(idBuffer)
+  writer.write(transferIdBuffer)
   writer.writeUInt64(amountAsPair)
   writer.write(executionConditionBuffer)
   writer.writeVarOctetString(expiresAtBuffer)
@@ -177,24 +213,24 @@ function serializePrepare ({ id, amount, executionCondition, expiresAt }, reques
 }
 
 function deserializePrepare (buffer) {
-  const { type, requestId, contents } = readEnvelope(buffer)
-  const reader = new Reader(contents)
+  const { type, requestId, data } = readEnvelope(buffer)
+  const reader = new Reader(data)
 
-  const id = uuidParse.unparse(reader.read(16))
-  const amount = twoNumbersToString(reader.readUInt64())
+  const transferId = uuidParse.unparse(reader.read(16))
+  const amount =twoNumbersToString(reader.readUInt64())
   const executionCondition = base64url(reader.read(32))
-  const expiresAt = readGeneralizedTime(reader) // TODO: how to read a timestamp
+  const expiresAt = readGeneralizedTime(reader)
   const protocolData = readProtocolData(reader)
 
-  return { requestId, id, amount, executionCondition, expiresAt, protocolData }
+  return { requestId, transferId, amount, executionCondition, expiresAt, protocolData }
 }
 
-function serializeFulfill ({ id, fulfillment }, requestId, protocolData) {
-  const idBuffer = Buffer.from(id.replace(/\-/g, ''), 'hex')
+function serializeFulfill ({ transferId, fulfillment }, requestId, protocolData) {
+  const transferIdBuffer = Buffer.from(transferId.replace(/\-/g, ''), 'hex')
   const fulfillmentBuffer = Buffer.from(fulfillment, 'base64')
   const writer = new Writer()
 
-  writer.write(idBuffer)
+  writer.write(transferIdBuffer)
   writer.write(fulfillmentBuffer)
   writeProtocolData(writer, protocolData)
 
@@ -202,37 +238,37 @@ function serializeFulfill ({ id, fulfillment }, requestId, protocolData) {
 }
 
 function deserializeFulfill (buffer) {
-  const { type, requestId, contents } = readEnvelope(buffer)
-  const reader = new Reader(contents)
+  const { type, requestId, data } = readEnvelope(buffer)
+  const reader = new Reader(data)
 
-  const id = uuidParse.unparse(reader.read(16))
-  const fulfillment = base64url(reader.read(32)) 
+  const transferId = uuidParse.unparse(reader.read(16))
+  const fulfillment = base64url(reader.read(32))
   const protocolData = readProtocolData(reader)
 
-  return { requestId, id, fulfillment, protocolData }
+  return { requestId, transferId, fulfillment, protocolData }
 }
 
-function serializeReject ({ id, reason }, requestId, protocolData) {
-  const idBuffer = Buffer.from(id.replace(/\-/g, ''), 'hex')
-  const reasonBuffer = Buffer.from(reason, 'base64')
+function serializeReject ({ transferId, rejectionReason }, requestId, protocolData) {
+  const transferIdBuffer = Buffer.from(transferId.replace(/\-/g, ''), 'hex')
+  const rejectionReasonBuffer = maybeSerializeIlpError(rejectionReason)
   const writer = new Writer()
 
-  writer.write(idBuffer)
-  writer.write(reasonBuffer)
+  writer.write(transferIdBuffer)
+  writer.write(rejectionReasonBuffer)
   writeProtocolData(writer, protocolData)
 
   return writeEnvelope(TYPE_REJECT, requestId, writer.getBuffer())
 }
 
 function deserializeReject (buffer) {
-  const { type, requestId, contents } = readEnvelope(buffer)
-  const reader = new Reader(contents)
+  const { type, requestId, data } = readEnvelope(buffer)
+  const reader = new Reader(data)
 
-  const id = uuidParse.unparse(reader.read(16))
-  const reason = readIlpPacket(reader) 
+  const transferId = uuidParse.unparse(reader.read(16))
+  const rejectionReason = readIlpError(reader)
   const protocolData = readProtocolData(reader)
 
-  return { requestId, id, reason, protocolData }
+  return { requestId, transferId, rejectionReason, protocolData }
 }
 
 function serializeMessage (requestId, protocolData) {
@@ -244,8 +280,8 @@ function serializeMessage (requestId, protocolData) {
 }
 
 function deserializeMessage (buffer) {
-  const { type, requestId, contents } = readEnvelope(buffer)
-  const reader = new Reader(contents)
+  const { type, requestId, data } = readEnvelope(buffer)
+  const reader = new Reader(data)
 
   const protocolData = readProtocolData(reader)
   return { requestId, protocolData }
@@ -259,6 +295,7 @@ module.exports = {
   TYPE_FULFILL,
   TYPE_REJECT,
   TYPE_MESSAGE,
+
   MIME_APPLICATION_OCTET_STREAM,
   MIME_TEXT_PLAIN_UTF8,
   MIME_APPLICATION_JSON,
