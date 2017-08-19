@@ -6,12 +6,14 @@ const BigNumber = require('bignumber.js')
 
 const TYPE_ACK = 1
 const TYPE_RESPONSE = 2
-const TYPE_CUSTOM_RESPONSE = 3
+const TYPE_ERROR = 3
 const TYPE_PREPARE = 4
 const TYPE_FULFILL = 5
 const TYPE_REJECT = 6
 const TYPE_MESSAGE = 7
-const TYPE_CUSTOM_REQUEST = 8
+const MIME_APPLICATION_OCTET_STREAM = 0
+const MIME_TEXT_PLAIN_UTF8 = 1
+const MIME_APPLICATION_JSON = 2
 
 const HIGH_WORD_MULTIPLIER = 0x100000000
 const GENERALIZED_TIME_REGEX =
@@ -78,36 +80,40 @@ function readEnvelope (envelope) {
   }
 }
 
-function writeSideData (writer, sideData) {
-  const lengthPrefixLengthPrefix = 1
-  const lengthPrefix = Object.keys(sideData).length
+function writeProtocolData (writer, protocolData) {
+  const lengthPrefix = protocolData.length
+  const lengthPrefixLengthPrefix = Math.max(1,
+    Math.ceil((Math.log(protocolData.length + 1) / Math.log(2)) / 8))
 
   writer.writeUInt8(lengthPrefixLengthPrefix)
-  writer.writeUInt8(lengthPrefix)
+  writer.writeUInt(lengthPrefix, lengthPrefixLengthPrefix)
 
-  for (const k of Object.keys(sideData)) {
-    writer.writeVarOctetString(Buffer.from(k, 'ascii'))
-    writer.writeVarOctetString(sideData[k])
+  for (const p of protocolData) {
+    writer.writeVarOctetString(Buffer.from(p.name, 'ascii'))
+    writer.writeUInt8(p.contentType)
+    writer.writeVarOctetString(p.data)
   }
 }
 
-function readSideData (reader) {
+function readProtocolData (reader) {
   const lengthPrefixPrefix = reader.readUInt8()
-  const lengthPrefix = reader.readUInt8() 
-  const sideData = {}
+  const lengthPrefix = reader.readUInt(lengthPrefixPrefix) 
+  const protocolData = []
 
   for (let i = 0; i < lengthPrefix; ++i) {
-    const key = reader.readVarOctetString()
-    const value = reader.readVarOctetString()
-    sideData[key.toString('ascii')] = value
+    const name = reader.readVarOctetString().toString('ascii')
+    const contentType = reader.readUInt8()
+    const data = reader.readVarOctetString()
+
+    protocolData.push({ name, contentType, data })
   }
 
-  return sideData
+  return protocolData
 }
 
-function serializeAck (requestId, sideData) {
+function serializeAck (requestId, protocolData) {
   const writer = new Writer()
-  writeSideData(writer, sideData)
+  writeProtocolData(writer, protocolData)
 
   return writeEnvelope(TYPE_ACK, requestId, writer.getBuffer())
 }
@@ -116,16 +122,13 @@ function deserializeAck (buffer) {
   const { type, requestId, contents } = readEnvelope(buffer)
   const reader = new Reader(contents)
 
-  const sideData = readSideData(reader)
-  return { requestId, sideData }
+  const protocolData = readProtocolData(reader)
+  return { requestId, protocolData }
 }
 
-function serializeResponse ({ ilp }, requestId, sideData) {
+function serializeResponse (requestId, protocolData) {
   const writer = new Writer()
-  const packet = Buffer.from(ilp, 'base64')
-
-  writer.write(packet)
-  writeSideData(writer, sideData)
+  writeProtocolData(writer, protocolData)
 
   return writeEnvelope(TYPE_RESPONSE, requestId, writer.getBuffer())
 }
@@ -134,40 +137,41 @@ function deserializeResponse (buffer) {
   const { type, requestId, contents } = readEnvelope(buffer)
   const reader = new Reader(contents)
 
-  const ilp = readIlpPacket(reader)
-  const sideData = readSideData(reader)
-  return { requestId, ilp, sideData }
+  const protocolData = readProtocolData(reader)
+  return { requestId, protocolData }
 }
 
-function serializeCustomResponse (requestId, sideData) {
+function serializeError ({ ilp }, requestId, protocolData) {
   const writer = new Writer()
-  writeSideData(writer, sideData)
-  
-  return writeEnvelope(TYPE_CUSTOM_RESPONSE, requestId, writer.getBuffer())
+  const packet = Buffer.from(ilp, 'base64')
+
+  writer.write(packet)
+  writeProtocolData(writer, protocolData)
+
+  return writeEnvelope(TYPE_ERROR, requestId, writer.getBuffer())
 }
 
-function deserializeCustomResponse (buffer) {
+function deserializeError (buffer) {
   const { type, requestId, contents } = readEnvelope(buffer)
   const reader = new Reader(contents)
 
-  const sideData = readSideData(reader)
-  return { requestId, sideData }
+  const ilp = readIlpPacket(reader)
+  const protocolData = readProtocolData(reader)
+  return { requestId, ilp, protocolData }
 }
 
-function serializePrepare ({ id, amount, executionCondition, expiresAt, ilp }, requestId, sideData) {
+function serializePrepare ({ id, amount, executionCondition, expiresAt }, requestId, protocolData) {
   const idBuffer = Buffer.from(id.replace(/\-/g, ''), 'hex')
   const amountAsPair = stringToTwoNumbers(amount)
   const executionConditionBuffer = Buffer.from(executionCondition, 'base64')
   const expiresAtBuffer = toGeneralizedTime(expiresAt) // TODO: how to write a timestamp
-  const packet = Buffer.from(ilp, 'base64')
   const writer = new Writer()
 
   writer.write(idBuffer)
   writer.writeUInt64(amountAsPair)
   writer.write(executionConditionBuffer)
   writer.writeVarOctetString(expiresAtBuffer)
-  writer.write(packet)
-  writeSideData(writer, sideData)
+  writeProtocolData(writer, protocolData)
 
   return writeEnvelope(TYPE_PREPARE, requestId, writer.getBuffer())
 }
@@ -180,20 +184,19 @@ function deserializePrepare (buffer) {
   const amount = twoNumbersToString(reader.readUInt64())
   const executionCondition = base64url(reader.read(32))
   const expiresAt = readGeneralizedTime(reader) // TODO: how to read a timestamp
-  const ilp = readIlpPacket(reader)
-  const sideData = readSideData(reader)
+  const protocolData = readProtocolData(reader)
 
-  return { requestId, id, amount, executionCondition, expiresAt, ilp, sideData }
+  return { requestId, id, amount, executionCondition, expiresAt, protocolData }
 }
 
-function serializeFulfill ({ id, fulfillment }, requestId, sideData) {
+function serializeFulfill ({ id, fulfillment }, requestId, protocolData) {
   const idBuffer = Buffer.from(id.replace(/\-/g, ''), 'hex')
   const fulfillmentBuffer = Buffer.from(fulfillment, 'base64')
   const writer = new Writer()
 
   writer.write(idBuffer)
   writer.write(fulfillmentBuffer)
-  writeSideData(writer, sideData)
+  writeProtocolData(writer, protocolData)
 
   return writeEnvelope(TYPE_FULFILL, requestId, writer.getBuffer())
 }
@@ -204,19 +207,19 @@ function deserializeFulfill (buffer) {
 
   const id = uuidParse.unparse(reader.read(16))
   const fulfillment = base64url(reader.read(32)) 
-  const sideData = readSideData(reader)
+  const protocolData = readProtocolData(reader)
 
-  return { requestId, id, fulfillment, sideData }
+  return { requestId, id, fulfillment, protocolData }
 }
 
-function serializeReject ({ id, reason }, requestId, sideData) {
+function serializeReject ({ id, reason }, requestId, protocolData) {
   const idBuffer = Buffer.from(id.replace(/\-/g, ''), 'hex')
   const reasonBuffer = Buffer.from(reason, 'base64')
   const writer = new Writer()
 
   writer.write(idBuffer)
   writer.write(reasonBuffer)
-  writeSideData(writer, sideData)
+  writeProtocolData(writer, protocolData)
 
   return writeEnvelope(TYPE_REJECT, requestId, writer.getBuffer())
 }
@@ -227,17 +230,15 @@ function deserializeReject (buffer) {
 
   const id = uuidParse.unparse(reader.read(16))
   const reason = readIlpPacket(reader) 
-  const sideData = readSideData(reader)
+  const protocolData = readProtocolData(reader)
 
-  return { requestId, id, reason, sideData }
+  return { requestId, id, reason, protocolData }
 }
 
-function serializeMessage ({ ilp }, requestId, sideData) {
-  const packet = Buffer.from(ilp, 'base64')
+function serializeMessage (requestId, protocolData) {
   const writer = new Writer()
 
-  writer.write(packet)
-  writeSideData(writer, sideData)
+  writeProtocolData(writer, protocolData)
 
   return writeEnvelope(TYPE_MESSAGE, requestId, writer.getBuffer())
 }
@@ -246,51 +247,35 @@ function deserializeMessage (buffer) {
   const { type, requestId, contents } = readEnvelope(buffer)
   const reader = new Reader(contents)
 
-  const ilp = readIlpPacket(reader)
-  const sideData = readSideData(reader)
-  return { requestId, ilp, sideData }
-}
-
-function serializeCustomRequest (requestId, sideData) {
-  const writer = new Writer()
-  writeSideData(writer, sideData)
-  
-  return writeEnvelope(TYPE_CUSTOM_REQUEST, requestId, writer.getBuffer())
-}
-
-function deserializeCustomRequest (buffer) {
-  const { type, requestId, contents } = readEnvelope(buffer)
-  const reader = new Reader(contents)
-
-  const sideData = readSideData(reader)
-  return { requestId, sideData }
+  const protocolData = readProtocolData(reader)
+  return { requestId, protocolData }
 }
 
 module.exports = {
   TYPE_ACK,
   TYPE_RESPONSE,
-  TYPE_CUSTOM_RESPONSE,
+  TYPE_ERROR,
   TYPE_PREPARE,
   TYPE_FULFILL,
   TYPE_REJECT,
   TYPE_MESSAGE,
-  TYPE_CUSTOM_REQUEST,
+  MIME_APPLICATION_OCTET_STREAM,
+  MIME_TEXT_PLAIN_UTF8,
+  MIME_APPLICATION_JSON,
 
   serializeAck,
   serializeResponse,
-  serializeCustomResponse,
+  serializeError,
   serializePrepare,
   serializeFulfill,
   serializeReject,
   serializeMessage,
-  serializeCustomRequest,
 
   deserializeAck,
   deserializeResponse,
-  deserializeCustomResponse,
+  deserializeError,
   deserializePrepare,
   deserializeFulfill,
   deserializeReject,
-  deserializeMessage,
-  deserializeCustomRequest
+  deserializeMessage
 }
