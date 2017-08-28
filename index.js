@@ -189,8 +189,6 @@ function serializeError ({ rejectionReason }, requestId, protocolData) {
   const writer = new Writer()
   const ilpPacket = maybeSerializeIlpError(rejectionReason)
   writer.write(ilpPacket)
-
-  writer.write(rejectionReason)
   writeProtocolData(writer, protocolData)
 
   return writeEnvelope(TYPE_ERROR, requestId, writer.getBuffer())
@@ -204,8 +202,8 @@ function deserializeError (buffer) {
   return { requestId, rejectionReason, protocolData }
 }
 
-function serializePrepare ({ id, amount, executionCondition, expiresAt }, requestId, protocolData) {
-  const transferIdBuffer = Buffer.from(id.replace(/-/g, ''), 'hex')
+function serializePrepare ({ transferId, amount, executionCondition, expiresAt }, requestId, protocolData) {
+  const transferIdBuffer = Buffer.from(transferId.replace(/-/g, ''), 'hex')
   const amountAsPair = stringToTwoNumbers(amount)
   const executionConditionBuffer = Buffer.from(executionCondition, 'base64')
   const expiresAtBuffer = toGeneralizedTimeBuffer(expiresAt)
@@ -233,8 +231,8 @@ function deserializePrepare (buffer) {
   return { requestId, transferId, amount, executionCondition, expiresAt, protocolData }
 }
 
-function serializeFulfill ({ id, fulfillment }, requestId, protocolData) {
-  const transferIdBuffer = Buffer.from(id.replace(/-/g, ''), 'hex')
+function serializeFulfill ({ transferId, fulfillment }, requestId, protocolData) {
+  const transferIdBuffer = Buffer.from(transferId.replace(/-/g, ''), 'hex')
   const fulfillmentBuffer = Buffer.from(fulfillment, 'base64')
   const writer = new Writer()
 
@@ -256,11 +254,11 @@ function deserializeFulfill (buffer) {
   return { requestId, transferId, fulfillment, protocolData }
 }
 
-function serializeReject ({ transferId, reason }, requestId, protocolData) {
-  const transferIdBuffer = Buffer.from(id.replace(/-/g, ''), 'hex')
-  const reasonBuffer = (reason === 'string') ? Buffer.from(reason, 'base64') : reason
-  const writer = new Writer()
+function serializeReject ({ transferId, rejectionReason }, requestId, protocolData) {
+  const transferIdBuffer = Buffer.from(transferId.replace(/-/g, ''), 'hex')
+  const rejectionReasonBuffer = maybeSerializeIlpError(rejectionReason)
 
+  const writer = new Writer()
   writer.write(transferIdBuffer)
   writer.write(rejectionReasonBuffer)
   writeProtocolData(writer, protocolData)
@@ -273,7 +271,7 @@ function deserializeReject (buffer) {
   const reader = new Reader(data)
 
   const transferId = uuidParse.unparse(reader.read(16))
-  const reason = readIlpError(reader)
+  const rejectionReason = readIlpError(reader)
   const protocolData = readProtocolData(reader)
 
   return { requestId, transferId, rejectionReason, protocolData }
