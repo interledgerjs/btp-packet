@@ -1,3 +1,5 @@
+'use strict'
+
 const { Reader, Writer } = require('oer-utils')
 const base64url = require('base64url')
 const uuidParse = require('uuid-parse')
@@ -102,7 +104,7 @@ function writeEnvelope (type, requestId, contents) {
 }
 
 function readEnvelope (envelope) {
-  const reader = new Reader(envelope)
+  const reader = Reader.from(envelope)
 
   const type = reader.readUInt8()
   const requestId = reader.readUInt32()
@@ -116,6 +118,10 @@ function readEnvelope (envelope) {
 }
 
 function writeProtocolData (writer, protocolData) {
+  if (!Array.isArray(protocolData)) {
+    throw new Error('protocolData must be an array')
+  }
+
   const lengthPrefix = protocolData.length
   const lengthPrefixLengthPrefix = Math.max(1,
     Math.ceil((Math.log(protocolData.length + 1) / Math.log(2)) / 8))
@@ -157,7 +163,7 @@ function serializeAck (requestId, protocolData) {
 }
 
 function deserializeAck (buffer) {
-  const { type, requestId, data } = readEnvelope(buffer)
+  const { requestId, data } = readEnvelope(buffer)
   const reader = new Reader(data)
 
   const protocolData = readProtocolData(reader)
@@ -172,7 +178,7 @@ function serializeResponse (requestId, protocolData) {
 }
 
 function deserializeResponse (buffer) {
-  const { type, requestId, data } = readEnvelope(buffer)
+  const { requestId, data } = readEnvelope(buffer)
   const reader = new Reader(data)
 
   const protocolData = readProtocolData(reader)
@@ -183,21 +189,23 @@ function serializeError ({ rejectionReason }, requestId, protocolData) {
   const writer = new Writer()
   const ilpPacket = maybeSerializeIlpError(rejectionReason)
   writer.write(ilpPacket)
+
+  writer.write(rejectionReason)
   writeProtocolData(writer, protocolData)
 
   return writeEnvelope(TYPE_ERROR, requestId, writer.getBuffer())
 }
 
 function deserializeError (buffer) {
-  const { type, requestId, data } = readEnvelope(buffer)
+  const { requestId, data } = readEnvelope(buffer)
   const reader = new Reader(data)
   const rejectionReason = readIlpError(reader)
   const protocolData = readProtocolData(reader)
   return { requestId, rejectionReason, protocolData }
 }
 
-function serializePrepare ({ transferId, amount, executionCondition, expiresAt }, requestId, protocolData) {
-  const transferIdBuffer = Buffer.from(transferId.replace(/\-/g, ''), 'hex')
+function serializePrepare ({ id, amount, executionCondition, expiresAt }, requestId, protocolData) {
+  const transferIdBuffer = Buffer.from(id.replace(/-/g, ''), 'hex')
   const amountAsPair = stringToTwoNumbers(amount)
   const executionConditionBuffer = Buffer.from(executionCondition, 'base64')
   const expiresAtBuffer = toGeneralizedTimeBuffer(expiresAt)
@@ -213,7 +221,7 @@ function serializePrepare ({ transferId, amount, executionCondition, expiresAt }
 }
 
 function deserializePrepare (buffer) {
-  const { type, requestId, data } = readEnvelope(buffer)
+  const { requestId, data } = readEnvelope(buffer)
   const reader = new Reader(data)
 
   const transferId = uuidParse.unparse(reader.read(16))
@@ -225,8 +233,8 @@ function deserializePrepare (buffer) {
   return { requestId, transferId, amount, executionCondition, expiresAt, protocolData }
 }
 
-function serializeFulfill ({ transferId, fulfillment }, requestId, protocolData) {
-  const transferIdBuffer = Buffer.from(transferId.replace(/\-/g, ''), 'hex')
+function serializeFulfill ({ id, fulfillment }, requestId, protocolData) {
+  const transferIdBuffer = Buffer.from(id.replace(/-/g, ''), 'hex')
   const fulfillmentBuffer = Buffer.from(fulfillment, 'base64')
   const writer = new Writer()
 
@@ -238,7 +246,7 @@ function serializeFulfill ({ transferId, fulfillment }, requestId, protocolData)
 }
 
 function deserializeFulfill (buffer) {
-  const { type, requestId, data } = readEnvelope(buffer)
+  const { requestId, data } = readEnvelope(buffer)
   const reader = new Reader(data)
 
   const transferId = uuidParse.unparse(reader.read(16))
@@ -248,9 +256,9 @@ function deserializeFulfill (buffer) {
   return { requestId, transferId, fulfillment, protocolData }
 }
 
-function serializeReject ({ transferId, rejectionReason }, requestId, protocolData) {
-  const transferIdBuffer = Buffer.from(transferId.replace(/\-/g, ''), 'hex')
-  const rejectionReasonBuffer = maybeSerializeIlpError(rejectionReason)
+function serializeReject ({ transferId, reason }, requestId, protocolData) {
+  const transferIdBuffer = Buffer.from(id.replace(/-/g, ''), 'hex')
+  const reasonBuffer = (reason === 'string') ? Buffer.from(reason, 'base64') : reason
   const writer = new Writer()
 
   writer.write(transferIdBuffer)
@@ -261,11 +269,11 @@ function serializeReject ({ transferId, rejectionReason }, requestId, protocolDa
 }
 
 function deserializeReject (buffer) {
-  const { type, requestId, data } = readEnvelope(buffer)
+  const { requestId, data } = readEnvelope(buffer)
   const reader = new Reader(data)
 
   const transferId = uuidParse.unparse(reader.read(16))
-  const rejectionReason = readIlpError(reader)
+  const reason = readIlpError(reader)
   const protocolData = readProtocolData(reader)
 
   return { requestId, transferId, rejectionReason, protocolData }
@@ -280,11 +288,48 @@ function serializeMessage (requestId, protocolData) {
 }
 
 function deserializeMessage (buffer) {
-  const { type, requestId, data } = readEnvelope(buffer)
+  const { requestId, data } = readEnvelope(buffer)
   const reader = new Reader(data)
 
   const protocolData = readProtocolData(reader)
   return { requestId, protocolData }
+}
+
+function deserializeClpPacket (buffer) {
+  const {typeString, packet} = _toTypeString(buffer)
+  return {
+    type: buffer[0],
+    typeString,
+    packet
+  }
+}
+
+function _toTypeString (buffer) {
+  switch (buffer[0]) {
+    case TYPE_ACK: return {
+      typeString: 'clp_ack',
+      packet: deserializeAck(buffer) }
+    case TYPE_RESPONSE: return {
+      typeString: 'clp_response',
+      packet: deserializeResponse(buffer) }
+    case TYPE_ERROR: return {
+      typeString: 'clp_error',
+      packet: deserializeError(buffer) }
+    case TYPE_PREPARE: return {
+      typeString: 'clp_prepare',
+      packet: deserializePrepare(buffer) }
+    case TYPE_FULFILL: return {
+      typeString: 'clp_fulfill',
+      packet: deserializeFulfill(buffer) }
+    case TYPE_REJECT: return {
+      typeString: 'clp_reject',
+      packet: deserializeReject(buffer) }
+    case TYPE_MESSAGE: return {
+      typeString: 'clp_message',
+      packet: deserializeMessage(buffer) }
+    default:
+      throw new Error('Packet has invalid type')
+  }
 }
 
 module.exports = {
@@ -314,5 +359,6 @@ module.exports = {
   deserializePrepare,
   deserializeFulfill,
   deserializeReject,
-  deserializeMessage
+  deserializeMessage,
+  deserializeClpPacket
 }

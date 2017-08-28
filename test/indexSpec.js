@@ -1,3 +1,5 @@
+'use strict'
+
 const Clp = require('..')
 const assert = require('chai').assert
 const IlpPacket = require('ilp-packet')
