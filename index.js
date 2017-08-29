@@ -5,7 +5,7 @@ const base64url = require('base64url')
 const uuidParse = require('uuid-parse')
 const dateFormat = require('dateformat')
 const BigNumber = require('bignumber.js')
-const { deserializeIlpError, serializeIlpError } = require('ilp-packet')
+const { serializeIlpError } = require('ilp-packet')
 
 const TYPE_ACK = 1
 const TYPE_RESPONSE = 2
@@ -96,6 +96,24 @@ function maybeSerializeIlpError (error) {
   return serializeIlpError(error)
 }
 
+function assertTransferId (transferIdBuffer) {
+  if (transferIdBuffer.length !== 16) {
+    throw new Error('transferId must be 2 bytes')
+  }
+}
+
+function assertFulfillment (fulfillmentBuffer) {
+  if (fulfillmentBuffer.length !== 32) {
+    throw new Error('fulfillment must be 4 bytes')
+  }
+}
+
+function assertCondition (conditonBuffer) {
+  if (conditonBuffer.length !== 32) {
+    throw new Error('fulfillment must be 4 bytes')
+  }
+}
+
 // TODO: move this function to the ilp-packet module, so we don't
 // have to parse the same data twice.
 function readIlpError (reader) {
@@ -156,6 +174,9 @@ function writePrepare (writer, data) {
   const amountAsPair = stringToTwoNumbers(data.amount)
   const executionConditionBuffer = Buffer.from(data.executionCondition, 'base64')
   const expiresAtBuffer = toGeneralizedTimeBuffer(data.expiresAt)
+  assertTransferId(transferIdBuffer)
+  assertCondition(executionConditionBuffer)
+
   writer.write(transferIdBuffer)
   writer.writeUInt64(amountAsPair)
   writer.write(executionConditionBuffer)
@@ -166,6 +187,9 @@ function writePrepare (writer, data) {
 function writeFulfill (writer, data) {
   const transferIdBuffer = Buffer.from(data.transferId.replace(/-/g, ''), 'hex')
   const fulfillmentBuffer = Buffer.from(data.fulfillment, 'base64')
+  assertTransferId(transferIdBuffer)
+  assertFulfillment(fulfillmentBuffer)
+
   writer.write(transferIdBuffer)
   writer.write(fulfillmentBuffer)
   writeProtocolData(writer, data.protocolData)
@@ -174,6 +198,8 @@ function writeFulfill (writer, data) {
 function writeReject (writer, data) {
   const transferIdBuffer = Buffer.from(data.transferId.replace(/-/g, ''), 'hex')
   const rejectionReasonBuffer = maybeSerializeIlpError(data.rejectionReason)
+  assertTransferId(transferIdBuffer)
+
   writer.write(transferIdBuffer)
   writer.write(rejectionReasonBuffer)
   writeProtocolData(writer, data.protocolData)
