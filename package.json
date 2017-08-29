@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "istanbul test -- _mocha"
+    "test": "istanbul test -- _mocha",
+    "lint": "eslint ."
   },
   "author": "",
   "license": "ISC",
