@@ -302,12 +302,10 @@ module.exports = {
   deserialize,
 
   // The following legacy functions use an alternative format to access the exposed
-  // serialize/deserialize functionality. There is one pair of such functions per CLP call.
-  // The object returned by the deserialize function differs per call, is different from
-  // the arguments passed to the corresponding serialize function, and is also different
-  // from the structure of CLP's OER encoding. Due to these disadvantages, these functions
-  // are marked as 'legacy functions' here; however, we did not remove them because
-  // the serialize ones are already used by the payment plugin framework.
+  // serialize/deserialize functionality. There is one such serialize* function per CLP call.
+  // The arguments passed to them is different from the structure of CLP's OER encoding.
+  // Therefore, these functions are marked as 'legacy functions' here; however, we did not remove them because
+  // they are already used by the payment plugin framework.
 
   serializeAck (requestId, protocolData) {
     return serialize({
@@ -316,26 +314,12 @@ module.exports = {
       data: protocolData
     })
   },
-  deserializeAck (buffer) {
-    const obj = deserialize(buffer)
-    return {
-      requestId: obj.requestId,
-      protocolData: obj.data
-    }
-  },
   serializeResponse (requestId, protocolData) {
     return serialize({
       type: TYPE_RESPONSE,
       requestId,
       data: protocolData
     })
-  },
-  deserializeResponse (buffer) {
-    const obj = deserialize(buffer)
-    return {
-      requestId: obj.requestId,
-      protocolData: obj.data
-    }
   },
   serializeError ({ rejectionReason }, requestId, protocolData) {
     return serialize({
@@ -346,14 +330,6 @@ module.exports = {
         protocolData
       }
     })
-  },
-  deserializeError (buffer) {
-    const obj = deserialize(buffer)
-    return {
-      requestId: obj.requestId,
-      rejectionReason: obj.data.rejectionReason,
-      protocolData: obj.data.protocolData
-    }
   },
   serializePrepare ({ transferId, amount, executionCondition, expiresAt }, requestId, protocolData) {
     return serialize({
@@ -368,17 +344,6 @@ module.exports = {
       }
     })
   },
-  deserializePrepare (buffer) {
-    const obj = deserialize(buffer)
-    return {
-      requestId: obj.requestId,
-      transferId: obj.data.transferId,
-      amount: obj.data.amount,
-      executionCondition: obj.data.executionCondition,
-      expiresAt: obj.data.expiresAt,
-      protocolData: obj.data.protocolData
-    }
-  },
   serializeFulfill ({ transferId, fulfillment }, requestId, protocolData) {
     return serialize({
       type: TYPE_FULFILL,
@@ -389,15 +354,6 @@ module.exports = {
         protocolData
       }
     })
-  },
-  deserializeFulfill (buffer) {
-    const obj = deserialize(buffer)
-    return {
-      requestId: obj.requestId,
-      transferId: obj.data.transferId,
-      fulfillment: obj.data.fulfillment,
-      protocolData: obj.data.protocolData
-    }
   },
   serializeReject ({ transferId, rejectionReason }, requestId, protocolData) {
     return serialize({
@@ -410,27 +366,11 @@ module.exports = {
       }
     })
   },
-  deserializeReject (buffer) {
-    const obj = deserialize(buffer)
-    return {
-      requestId: obj.requestId,
-      transferId: obj.data.transferId,
-      rejectionReason: obj.data.rejectionReason,
-      protocolData: obj.data.protocolData
-    }
-  },
   serializeMessage (requestId, protocolData) {
     return serialize({
       type: TYPE_MESSAGE,
       requestId,
       data: protocolData
     })
-  },
-  deserializeMessage (buffer) {
-    const obj = deserialize(buffer)
-    return {
-      requestId: obj.requestId,
-      protocolData: obj.data
-    }
   }
 }

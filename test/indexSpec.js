@@ -165,7 +165,7 @@ describe('Common Ledger Protocol', () => {
     })
   })
 
-  describe('Fufill', () => {
+  describe('Fulfill', () => {
     it('should serialize/deserialize without losing data', function () {
       const obj = {
         type: Clp.TYPE_FULFILL,
@@ -235,157 +235,79 @@ describe('Common Ledger Protocol', () => {
     })
   })
 
-  describe('Ack (legacy)', () => {
-    it('should serialize / deserialize without losing data', function () {
+  describe('serializeAck (legacy)', () => {
+    it('should serialize without losing data', function () {
       const buf = Clp.serializeAck(1, this.protocolData)
       assert.deepEqual(buf, this.buffers.ack)
-      const res = Clp.deserializeAck(buf)
-
-      assert.deepEqual(res, {
-        requestId: 1,
-        protocolData: this.protocolData
-      })
     })
   })
 
-  describe('Response (legacy)', () => {
-    it('should serialize/deserialize without losing data', function () {
+  describe('serializeResponse (legacy)', () => {
+    it('should serialize without losing data', function () {
       const buf = Clp.serializeResponse(1, this.protocolData)
       assert.deepEqual(buf, this.buffers.response)
-      const res = Clp.deserializeResponse(buf)
-
-      assert.deepEqual(res, {
-        requestId: 1,
-        protocolData: this.protocolData
-      })
     })
   })
 
-  describe('Error (legacy)', () => {
-    it('should serialize/deserialize without losing data', function () {
+  describe('serializeError (legacy)', () => {
+    it('should serialize without losing data', function () {
       const buf = Clp.serializeError({ rejectionReason: this.error }, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.error)
-      const res = Clp.deserializeError(buf)
-
-      assert.deepEqual(res, {
-        requestId: 1,
-        rejectionReason: this.error,
-        protocolData: this.protocolData
-      })
     })
 
     it('should serialize from buffer without losing data', function () {
       const buf = Clp.serializeError({ rejectionReason: this.errorBuf }, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.error)
-      const res = Clp.deserializeError(buf)
-
-      assert.deepEqual(res, {
-        requestId: 1,
-        rejectionReason: this.error,
-        protocolData: this.protocolData
-      })
     })
 
     it('should serialize from string without losing data', function () {
       const buf = Clp.serializeError({ rejectionReason: this.errorStr }, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.error)
-      const res = Clp.deserializeError(buf)
-
-      assert.deepEqual(res, {
-        requestId: 1,
-        rejectionReason: this.error,
-        protocolData: this.protocolData
-      })
     })
   })
 
-  describe('Prepare (legacy)', () => {
-    it('should serialize/deserialize without losing data', function () {
+  describe('serializePrepare (legacy)', () => {
+    it('should serialize without losing data', function () {
       const buf = Clp.serializePrepare(this.transfer, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.prepare1)
-      const res = Clp.deserializePrepare(buf)
-
-      assert.deepEqual(res, Object.assign({
-        requestId: 1,
-        protocolData: this.protocolData
-      }, this.transfer))
     })
 
-    it('should serialize/deserialize 64-bit amount without losing precision', function () {
+    it('should serialize 64-bit amount without losing precision', function () {
       this.transfer.amount = '1234567890123'
 
       const buf = Clp.serializePrepare(this.transfer, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.prepare2)
-      const res = Clp.deserializePrepare(buf)
-
-      assert.deepEqual(res, Object.assign({
-        requestId: 1,
-        protocolData: this.protocolData
-      }, this.transfer))
     })
   })
 
-  describe('Fufill (legacy)', () => {
-    it('should serialize/deserialize without losing data', function () {
+  describe('serializeFulfill (legacy)', () => {
+    it('should serialize without losing data', function () {
       const buf = Clp.serializeFulfill(this.fulfill, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.fulfill)
-      const res = Clp.deserializeFulfill(buf)
-
-      assert.deepEqual(res, Object.assign({
-        requestId: 1,
-        protocolData: this.protocolData
-      }, this.fulfill))
     })
   })
 
-  describe('Reject (legacy)', () => {
-    it('should serialize/deserialize without losing data', function () {
+  describe('serializeReject (legacy)', () => {
+    it('should serialize without losing data', function () {
       const buf = Clp.serializeReject(this.reject, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.reject)
-      const res = Clp.deserializeReject(buf)
-
-      assert.deepEqual(res, Object.assign({
-        requestId: 1,
-        rejectionReason: this.error,
-        protocolData: this.protocolData
-      }, this.reject))
     })
 
     it('should serialize from buffer without losing data', function () {
       const buf = Clp.serializeReject(this.rejectBuf, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.reject)
-      const res = Clp.deserializeReject(buf)
-
-      assert.deepEqual(res, Object.assign({
-        requestId: 1,
-        rejectionReason: this.error,
-        protocolData: this.protocolData
-      }, this.reject))
     })
 
     it('should serialize from string without losing data', function () {
       const buf = Clp.serializeReject(this.rejectStr, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.reject)
-      const res = Clp.deserializeReject(buf)
-
-      assert.deepEqual(res, Object.assign({
-        requestId: 1,
-        rejectionReason: this.error,
-        protocolData: this.protocolData
-      }, this.reject))
     })
   })
 
-  describe('Message (legacy)', () => {
-    it('should serialize/deserialize without losing data', function () {
+  describe('serializeMessage (legacy)', () => {
+    it('should serialize without losing data', function () {
       const buf = Clp.serializeMessage(1, this.protocolData)
       assert.deepEqual(buf, this.buffers.message)
-      const res = Clp.deserializeMessage(buf)
-
-      assert.deepEqual(res, {
-        requestId: 1,
-        protocolData: this.protocolData
-      })
     })
   })
 })
