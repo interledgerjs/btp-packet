@@ -1,7 +1,6 @@
 'use strict'
 
 const { Reader, Writer } = require('oer-utils')
-const base64url = require('base64url')
 const uuidParse = require('uuid-parse')
 const dateFormat = require('dateformat')
 const BigNumber = require('bignumber.js')
@@ -154,7 +153,7 @@ function writeError (writer, data) {
 function writePrepare (writer, data) {
   const transferIdBuffer = Buffer.from(data.transferId.replace(/-/g, ''), 'hex')
   const amountAsPair = stringToTwoNumbers(data.amount)
-  const executionConditionBuffer = Buffer.from(data.executionCondition, 'base64')
+  const executionConditionBuffer = data.executionCondition
   const expiresAtBuffer = toGeneralizedTimeBuffer(data.expiresAt)
   writer.write(transferIdBuffer)
   writer.writeUInt64(amountAsPair)
@@ -165,7 +164,7 @@ function writePrepare (writer, data) {
 
 function writeFulfill (writer, data) {
   const transferIdBuffer = Buffer.from(data.transferId.replace(/-/g, ''), 'hex')
-  const fulfillmentBuffer = Buffer.from(data.fulfillment, 'base64')
+  const fulfillmentBuffer = data.fulfillment
   writer.write(transferIdBuffer)
   writer.write(fulfillmentBuffer)
   writeProtocolData(writer, data.protocolData)
@@ -224,7 +223,7 @@ function readError (reader) {
 function readPrepare (reader) {
   const transferId = uuidParse.unparse(reader.read(16))
   const amount = twoNumbersToString(reader.readUInt64())
-  const executionCondition = base64url(reader.read(32))
+  const executionCondition = reader.read(32)
   const expiresAt = readGeneralizedTime(reader)
   const protocolData = readProtocolData(reader)
   return { transferId, amount, executionCondition, expiresAt, protocolData }
@@ -232,7 +231,7 @@ function readPrepare (reader) {
 
 function readFulfill (reader) {
   const transferId = uuidParse.unparse(reader.read(16))
-  const fulfillment = base64url(reader.read(32))
+  const fulfillment = reader.read(32)
   const protocolData = readProtocolData(reader)
   return { transferId, fulfillment, protocolData }
 }
