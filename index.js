@@ -104,7 +104,7 @@ function readIlpError (reader) {
   const length = Buffer.from([ reader.readLengthPrefix() ])
   reader.restore()
   const contents = reader.readVarOctetString()
-  return deserializeIlpError(Buffer.concat([ type, length, contents ]))
+  return base64url(Buffer.concat([ type, length, contents ]))
 }
 
 function writeProtocolData (writer, protocolData) {
@@ -257,7 +257,7 @@ function deserialize (buffer) {
     case TYPE_ACK:
     case TYPE_RESPONSE:
     case TYPE_MESSAGE:
-      data = readProtocolData(reader) // see https://github.com/interledger/rfcs/issues/284
+      data = {protocolData: readProtocolData(reader)} // see https://github.com/interledger/rfcs/issues/284
       break
 
     case TYPE_ERROR:
