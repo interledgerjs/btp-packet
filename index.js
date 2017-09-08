@@ -5,7 +5,7 @@ const base64url = require('base64url')
 const uuidParse = require('uuid-parse')
 const dateFormat = require('dateformat')
 const BigNumber = require('bignumber.js')
-const { deserializeIlpError, serializeIlpError } = require('ilp-packet')
+const { serializeIlpError } = require('ilp-packet')
 
 const TYPE_ACK = 1
 const TYPE_RESPONSE = 2
