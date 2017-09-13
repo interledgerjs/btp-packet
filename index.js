@@ -144,8 +144,19 @@ function readProtocolData (reader) {
 }
 
 function writeError (writer, data) {
-  const ilpPacket = maybeSerializeIlpError(data.rejectionReason)
-  writer.write(ilpPacket)
+  if (data.code.length !== 3) {
+    throw new Error(`error code must be 3 characters, got: "${data.code}"`)
+  }
+
+  const codeBuffer = Buffer.from(data.code, 'ascii')
+  const nameBuffer = Buffer.from(data.name, 'ascii')
+  const triggeredAtBuffer = toGeneralizedTimeBuffer(data.triggeredAt)
+  const dataBuffer = Buffer.from(data.data, 'utf8')
+
+  writer.write(codeBuffer)
+  writer.writeVarOctetString(nameBuffer)
+  writer.writeVarOctetString(triggeredAtBuffer)
+  writer.writeVarOctetString(dataBuffer)
   writeProtocolData(writer, data.protocolData)
 }
 
@@ -213,9 +224,13 @@ function serialize (obj) {
 }
 
 function readError (reader) {
-  const rejectionReason = readIlpError(reader)
+  const code = reader.read(3).toString('ascii')
+  const name = reader.readVarOctetString().toString('ascii')
+  const triggeredAt = readGeneralizedTime(reader)
+  const data = reader.readVarOctetString().toString('utf8')
   const protocolData = readProtocolData(reader)
-  return { rejectionReason, protocolData }
+
+  return { code, name, triggeredAt, data, protocolData }
 }
 
 function readPrepare (reader) {
@@ -307,12 +322,16 @@ module.exports = {
       data: { protocolData }
     })
   },
-  serializeError (rejectionReason, requestId, protocolData) {
+  serializeError (error, requestId, protocolData) {
+    const { code, name, triggeredAt, data } = error
     return serialize({
       type: TYPE_ERROR,
       requestId,
       data: {
-        rejectionReason,
+        code,
+        name,
+        triggeredAt,
+        data,
         protocolData
       }
     })
