@@ -1,11 +1,11 @@
 'use strict'
 
-const Clp = require('..')
+const Btp = require('..')
 const assert = require('chai').assert
 const IlpPacket = require('ilp-packet')
 const base64url = require('base64url')
 
-describe('Common Ledger Protocol', () => {
+describe('Bilateral Transfer Protocol', () => {
   beforeEach(function () {
     this.ilpPacket = IlpPacket.serializeIlpPayment({
       account: 'example.red.alice',
@@ -13,10 +13,10 @@ describe('Common Ledger Protocol', () => {
     })
 
     this.protocolData = [
-      { protocolName: 'ilp', contentType: Clp.MIME_APPLICATION_OCTET_STREAM, data: this.ilpPacket },
-      { protocolName: 'foo', contentType: Clp.MIME_APPLICATION_OCTET_STREAM, data: Buffer.from('bar') },
-      { protocolName: 'beep', contentType: Clp.MIME_TEXT_PLAIN_UTF8, data: Buffer.from('boop') },
-      { protocolName: 'json', contentType: Clp.MIME_APPLICATION_JSON, data: Buffer.from('{}') }
+      { protocolName: 'ilp', contentType: Btp.MIME_APPLICATION_OCTET_STREAM, data: this.ilpPacket },
+      { protocolName: 'foo', contentType: Btp.MIME_APPLICATION_OCTET_STREAM, data: Buffer.from('bar') },
+      { protocolName: 'beep', contentType: Btp.MIME_TEXT_PLAIN_UTF8, data: Buffer.from('boop') },
+      { protocolName: 'json', contentType: Btp.MIME_APPLICATION_JSON, data: Buffer.from('{}') }
     ]
 
     this.transfer = {
@@ -71,74 +71,74 @@ describe('Common Ledger Protocol', () => {
   describe('Ack', () => {
     it('should serialize/deserialize without losing data', function () {
       const obj = {
-        type: Clp.TYPE_ACK,
+        type: Btp.TYPE_ACK,
         requestId: 1,
         data: {
           protocolData: this.protocolData
         }
       }
-      assert.deepEqual(Clp.serialize(obj), this.buffers.ack)
-      assert.deepEqual(Clp.deserialize(this.buffers.ack), obj)
+      assert.deepEqual(Btp.serialize(obj), this.buffers.ack)
+      assert.deepEqual(Btp.deserialize(this.buffers.ack), obj)
     })
   })
 
   describe('Response', () => {
     it('should serialize/deserialize without losing data', function () {
       const obj = {
-        type: Clp.TYPE_RESPONSE,
+        type: Btp.TYPE_RESPONSE,
         requestId: 1,
         data: {
           protocolData: this.protocolData
         }
       }
-      assert.deepEqual(Clp.serialize(obj), this.buffers.response)
-      assert.deepEqual(Clp.deserialize(this.buffers.response), obj)
+      assert.deepEqual(Btp.serialize(obj), this.buffers.response)
+      assert.deepEqual(Btp.deserialize(this.buffers.response), obj)
     })
   })
 
   describe('Error', () => {
     it.skip('should serialize/deserialize without losing data', function () {
       const obj = {
-        type: Clp.TYPE_ERROR,
+        type: Btp.TYPE_ERROR,
         requestId: 1,
         data: {
           protocolData: this.protocolData,
           rejectionReason: this.error
         }
       }
-      assert.deepEqual(Clp.serialize(obj), this.buffers.error)
-      assert.deepEqual(Clp.deserialize(this.buffers.error), obj)
+      assert.deepEqual(Btp.serialize(obj), this.buffers.error)
+      assert.deepEqual(Btp.deserialize(this.buffers.error), obj)
     })
 
     it('should serialize from buffer without losing data', function () {
       const objWithBuf = {
-        type: Clp.TYPE_ERROR,
+        type: Btp.TYPE_ERROR,
         requestId: 1,
         data: {
           protocolData: this.protocolData,
           rejectionReason: this.errorBuf
         }
       }
-      assert.deepEqual(Clp.serialize(objWithBuf), this.buffers.error)
+      assert.deepEqual(Btp.serialize(objWithBuf), this.buffers.error)
     })
 
     it('should serialize from string without losing data', function () {
       const objWithStr = {
-        type: Clp.TYPE_ERROR,
+        type: Btp.TYPE_ERROR,
         requestId: 1,
         data: {
           protocolData: this.protocolData,
           rejectionReason: this.errorStr
         }
       }
-      assert.deepEqual(Clp.serialize(objWithStr), this.buffers.error)
+      assert.deepEqual(Btp.serialize(objWithStr), this.buffers.error)
     })
   })
 
   describe('Prepare', () => {
     it('should serialize/deserialize without losing data', function () {
       const obj = {
-        type: Clp.TYPE_PREPARE,
+        type: Btp.TYPE_PREPARE,
         requestId: 1,
         data: {
           protocolData: this.protocolData,
@@ -148,13 +148,13 @@ describe('Common Ledger Protocol', () => {
           executionCondition: this.transfer.executionCondition
         }
       }
-      assert.deepEqual(Clp.serialize(obj), this.buffers.prepare1)
-      assert.deepEqual(Clp.deserialize(this.buffers.prepare1), obj)
+      assert.deepEqual(Btp.serialize(obj), this.buffers.prepare1)
+      assert.deepEqual(Btp.deserialize(this.buffers.prepare1), obj)
     })
 
     it('should serialize/deserialize 64-bit amount without losing precision', function () {
       const obj = {
-        type: Clp.TYPE_PREPARE,
+        type: Btp.TYPE_PREPARE,
         requestId: 1,
         data: {
           protocolData: this.protocolData,
@@ -164,15 +164,15 @@ describe('Common Ledger Protocol', () => {
           executionCondition: this.transfer.executionCondition
         }
       }
-      assert.deepEqual(Clp.serialize(obj), this.buffers.prepare2)
-      assert.deepEqual(Clp.deserialize(this.buffers.prepare2), obj)
+      assert.deepEqual(Btp.serialize(obj), this.buffers.prepare2)
+      assert.deepEqual(Btp.deserialize(this.buffers.prepare2), obj)
     })
   })
 
   describe('Fulfill', () => {
     it('should serialize/deserialize without losing data', function () {
       const obj = {
-        type: Clp.TYPE_FULFILL,
+        type: Btp.TYPE_FULFILL,
         requestId: 1,
         data: {
           protocolData: this.protocolData,
@@ -180,15 +180,15 @@ describe('Common Ledger Protocol', () => {
           fulfillment: this.fulfill.fulfillment
         }
       }
-      assert.deepEqual(Clp.serialize(obj), this.buffers.fulfill)
-      assert.deepEqual(Clp.deserialize(this.buffers.fulfill), obj)
+      assert.deepEqual(Btp.serialize(obj), this.buffers.fulfill)
+      assert.deepEqual(Btp.deserialize(this.buffers.fulfill), obj)
     })
   })
 
   describe('Reject', () => {
     it.skip('should serialize/deserialize without losing data', function () {
       const obj = {
-        type: Clp.TYPE_REJECT,
+        type: Btp.TYPE_REJECT,
         requestId: 1,
         data: {
           protocolData: this.protocolData,
@@ -196,13 +196,13 @@ describe('Common Ledger Protocol', () => {
           rejectionReason: this.error
         }
       }
-      assert.deepEqual(Clp.serialize(obj), this.buffers.reject)
-      assert.deepEqual(Clp.deserialize(this.buffers.reject), obj)
+      assert.deepEqual(Btp.serialize(obj), this.buffers.reject)
+      assert.deepEqual(Btp.deserialize(this.buffers.reject), obj)
     })
 
     it('should serialize from buffer without losing data', function () {
       const objWithBuf = {
-        type: Clp.TYPE_REJECT,
+        type: Btp.TYPE_REJECT,
         requestId: 1,
         data: {
           protocolData: this.protocolData,
@@ -210,12 +210,12 @@ describe('Common Ledger Protocol', () => {
           rejectionReason: this.errorBuf
         }
       }
-      assert.deepEqual(Clp.serialize(objWithBuf), this.buffers.reject)
+      assert.deepEqual(Btp.serialize(objWithBuf), this.buffers.reject)
     })
 
     it('should serialize from string without losing data', function () {
       const objWithStr = {
-        type: Clp.TYPE_REJECT,
+        type: Btp.TYPE_REJECT,
         requestId: 1,
         data: {
           protocolData: this.protocolData,
@@ -223,96 +223,96 @@ describe('Common Ledger Protocol', () => {
           rejectionReason: this.errorStr
         }
       }
-      assert.deepEqual(Clp.serialize(objWithStr), this.buffers.reject)
+      assert.deepEqual(Btp.serialize(objWithStr), this.buffers.reject)
     })
   })
 
   describe('Message', () => {
     it('should serialize/deserialize without losing data', function () {
       const obj = {
-        type: Clp.TYPE_MESSAGE,
+        type: Btp.TYPE_MESSAGE,
         requestId: 1,
         data: {
           protocolData: this.protocolData
         }
       }
-      assert.deepEqual(Clp.serialize(obj), this.buffers.message)
-      assert.deepEqual(Clp.deserialize(this.buffers.message), obj)
+      assert.deepEqual(Btp.serialize(obj), this.buffers.message)
+      assert.deepEqual(Btp.deserialize(this.buffers.message), obj)
     })
   })
 
   describe('serializeAck', () => {
     it('should serialize without losing data', function () {
-      const buf = Clp.serializeAck(1, this.protocolData)
+      const buf = Btp.serializeAck(1, this.protocolData)
       assert.deepEqual(buf, this.buffers.ack)
     })
   })
 
   describe('serializeResponse', () => {
     it('should serialize without losing data', function () {
-      const buf = Clp.serializeResponse(1, this.protocolData)
+      const buf = Btp.serializeResponse(1, this.protocolData)
       assert.deepEqual(buf, this.buffers.response)
     })
   })
 
   describe('serializeError', () => {
     it('should serialize without losing data', function () {
-      const buf = Clp.serializeError(this.error, 1, this.protocolData)
+      const buf = Btp.serializeError(this.error, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.error)
     })
 
     it('should serialize from buffer without losing data', function () {
-      const buf = Clp.serializeError(this.errorBuf, 1, this.protocolData)
+      const buf = Btp.serializeError(this.errorBuf, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.error)
     })
 
     it('should serialize from string without losing data', function () {
-      const buf = Clp.serializeError(this.errorStr, 1, this.protocolData)
+      const buf = Btp.serializeError(this.errorStr, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.error)
     })
   })
 
   describe('serializePrepare', () => {
     it('should serialize without losing data', function () {
-      const buf = Clp.serializePrepare(this.transfer, 1, this.protocolData)
+      const buf = Btp.serializePrepare(this.transfer, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.prepare1)
     })
 
     it('should serialize 64-bit amount without losing precision', function () {
       this.transfer.amount = '1234567890123'
 
-      const buf = Clp.serializePrepare(this.transfer, 1, this.protocolData)
+      const buf = Btp.serializePrepare(this.transfer, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.prepare2)
     })
   })
 
   describe('serializeFulfill', () => {
     it('should serialize without losing data', function () {
-      const buf = Clp.serializeFulfill(this.fulfill, 1, this.protocolData)
+      const buf = Btp.serializeFulfill(this.fulfill, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.fulfill)
     })
   })
 
   describe('serializeReject', () => {
     it('should serialize without losing data', function () {
-      const buf = Clp.serializeReject(this.reject, 1, this.protocolData)
+      const buf = Btp.serializeReject(this.reject, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.reject)
     })
 
     it('should serialize from buffer without losing data', function () {
-      const buf = Clp.serializeReject(this.rejectBuf, 1, this.protocolData)
+      const buf = Btp.serializeReject(this.rejectBuf, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.reject)
     })
 
     it('should serialize from string without losing data', function () {
-      const buf = Clp.serializeReject(this.rejectStr, 1, this.protocolData)
+      const buf = Btp.serializeReject(this.rejectStr, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.reject)
     })
   })
 
   describe('serializeMessage', () => {
     it('should serialize without losing data', function () {
-      const buf = Clp.serializeMessage(1, this.protocolData)
+      const buf = Btp.serializeMessage(1, this.protocolData)
       assert.deepEqual(buf, this.buffers.message)
     })
   })

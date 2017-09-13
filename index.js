@@ -27,7 +27,7 @@ function typeToString (type) {
     case TYPE_FULFILL: return 'TYPE_FULFILL'
     case TYPE_REJECT: return 'TYPE_REJECT'
     case TYPE_MESSAGE: return 'TYPE_MESSAGE'
-    default: throw new Error('Unrecognized clp packet type')
+    default: throw new Error('Unrecognized BTP packet type')
   }
 }
 
@@ -44,7 +44,7 @@ const GENERALIZED_TIME_REGEX =
 // The requestId variable in Message corresponds to the 'id' field in the
 // Message class of the LedgerPluginInterface, see:
 // https://interledger.org/rfcs/0004-ledger-plugin-interface/#class-message
-// However, in CLP, all calls have a requestId, even though in LPI only
+// However, in BTP, all calls have a requestId, even though in LPI only
 // sendRequest does.
 //
 // Prepare / Fulfill / Reject correspond to
@@ -56,8 +56,8 @@ const GENERALIZED_TIME_REGEX =
 // Notes about variable naming - comparison with asn.1 definition:
 //
 // The term 'Envelope' here correspond to the
-// whole CommonLedgerProtocolPacket, see:
-// https://github.com/interledger/rfcs/blob/master/asn1/CommonLedgerProtocol.asn
+// whole BilateralTransferProtocolPacket, see:
+// https://github.com/interledger/rfcs/blob/master/asn1/BilateralTransferProtocol.asn
 
 function twoNumbersToString (num) {
   const [ hi, lo ] = num
@@ -302,7 +302,7 @@ module.exports = {
   deserialize,
 
   // The following functions use an alternative format to access the exposed
-  // serialize/deserialize functionality. There is one such serialize* function per CLP call.
+  // serialize/deserialize functionality. There is one such serialize* function per BTP call.
   // The arguments passed to them are aligned with the objects defined in the Ledger-Plugin-Interface (LPI),
   // which makes these functions convenient to use when working with LPI objects.
   serializeAck (requestId, protocolData) {
