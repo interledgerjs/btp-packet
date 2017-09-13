@@ -180,28 +180,28 @@ function writeReject (writer, data) {
 }
 
 function serialize (obj) {
-  const writer = new Writer()
+  const contentsWriter = new Writer()
   switch (obj.type) {
     case TYPE_ACK:
     case TYPE_RESPONSE:
     case TYPE_MESSAGE:
-      writeProtocolData(writer, obj.data) // see https://github.com/interledger/rfcs/issues/284
+      writeProtocolData(contentsWriter, obj.data.protocolData) // see https://github.com/interledger/rfcs/issues/284
       break
 
     case TYPE_ERROR:
-      writeError(writer, obj.data)
+      writeError(contentsWriter, obj.data)
       break
 
     case TYPE_PREPARE:
-      writePrepare(writer, obj.data)
+      writePrepare(contentsWriter, obj.data)
       break
 
     case TYPE_FULFILL:
-      writeFulfill(writer, obj.data)
+      writeFulfill(contentsWriter, obj.data)
       break
 
     case TYPE_REJECT:
-      writeReject(writer, obj.data)
+      writeReject(contentsWriter, obj.data)
       break
 
     default:
@@ -211,7 +211,7 @@ function serialize (obj) {
   const envelopeWriter = new Writer()
   envelopeWriter.writeUInt8(obj.type)
   envelopeWriter.writeUInt32(obj.requestId)
-  envelopeWriter.writeVarOctetString(writer.getBuffer())
+  envelopeWriter.writeVarOctetString(contentsWriter.getBuffer())
   return envelopeWriter.getBuffer()
 }
 
@@ -257,7 +257,7 @@ function deserialize (buffer) {
     case TYPE_ACK:
     case TYPE_RESPONSE:
     case TYPE_MESSAGE:
-      data = {protocolData: readProtocolData(reader)} // see https://github.com/interledger/rfcs/issues/284
+      data = {protocolData: readProtocolData(reader)}
       break
 
     case TYPE_ERROR:
@@ -301,27 +301,25 @@ module.exports = {
   serialize,
   deserialize,
 
-  // The following legacy functions use an alternative format to access the exposed
+  // The following functions use an alternative format to access the exposed
   // serialize/deserialize functionality. There is one such serialize* function per CLP call.
-  // The arguments passed to them is different from the structure of CLP's OER encoding.
-  // Therefore, these functions are marked as 'legacy functions' here; however, we did not remove them because
-  // they are already used by the payment plugin framework.
-
+  // The arguments passed to them are aligned with the objects defined in the Ledger-Plugin-Interface (LPI),
+  // which makes these functions convenient to use when working with LPI objects.
   serializeAck (requestId, protocolData) {
     return serialize({
       type: TYPE_ACK,
       requestId,
-      data: protocolData
+      data: { protocolData }
     })
   },
   serializeResponse (requestId, protocolData) {
     return serialize({
       type: TYPE_RESPONSE,
       requestId,
-      data: protocolData
+      data: { protocolData }
     })
   },
-  serializeError ({ rejectionReason }, requestId, protocolData) {
+  serializeError (rejectionReason, requestId, protocolData) {
     return serialize({
       type: TYPE_ERROR,
       requestId,
@@ -331,7 +329,8 @@ module.exports = {
       }
     })
   },
-  serializePrepare ({ transferId, amount, executionCondition, expiresAt }, requestId, protocolData) {
+  serializePrepare (transfer, requestId, protocolData) {
+    const { transferId, amount, executionCondition, expiresAt } = transfer
     return serialize({
       type: TYPE_PREPARE,
       requestId,
@@ -344,7 +343,8 @@ module.exports = {
       }
     })
   },
-  serializeFulfill ({ transferId, fulfillment }, requestId, protocolData) {
+  serializeFulfill (fulfill, requestId, protocolData) {
+    const { transferId, fulfillment } = fulfill
     return serialize({
       type: TYPE_FULFILL,
       requestId,
@@ -355,7 +355,8 @@ module.exports = {
       }
     })
   },
-  serializeReject ({ transferId, rejectionReason }, requestId, protocolData) {
+  serializeReject (reject, requestId, protocolData) {
+    const { transferId, rejectionReason } = reject
     return serialize({
       type: TYPE_REJECT,
       requestId,
@@ -370,7 +371,7 @@ module.exports = {
     return serialize({
       type: TYPE_MESSAGE,
       requestId,
-      data: protocolData
+      data: { protocolData }
     })
   }
 }
