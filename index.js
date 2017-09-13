@@ -7,20 +7,18 @@ const dateFormat = require('dateformat')
 const BigNumber = require('bignumber.js')
 const { serializeIlpError } = require('ilp-packet')
 
-const TYPE_ACK = 1
-const TYPE_RESPONSE = 2
-const TYPE_ERROR = 3
-const TYPE_PREPARE = 4
-const TYPE_FULFILL = 5
-const TYPE_REJECT = 6
-const TYPE_MESSAGE = 7
+const TYPE_RESPONSE = 1
+const TYPE_ERROR = 2
+const TYPE_PREPARE = 3
+const TYPE_FULFILL = 4
+const TYPE_REJECT = 5
+const TYPE_MESSAGE = 6
 const MIME_APPLICATION_OCTET_STREAM = 0
 const MIME_TEXT_PLAIN_UTF8 = 1
 const MIME_APPLICATION_JSON = 2
 
 function typeToString (type) {
   switch (type) {
-    case TYPE_ACK: return 'TYPE_ACK'
     case TYPE_RESPONSE: return 'TYPE_RESPONSE'
     case TYPE_ERROR: return 'TYPE_ERROR'
     case TYPE_PREPARE: return 'TYPE_PREPARE'
@@ -182,7 +180,6 @@ function writeReject (writer, data) {
 function serialize (obj) {
   const contentsWriter = new Writer()
   switch (obj.type) {
-    case TYPE_ACK:
     case TYPE_RESPONSE:
     case TYPE_MESSAGE:
       writeProtocolData(contentsWriter, obj.data.protocolData) // see https://github.com/interledger/rfcs/issues/284
@@ -254,7 +251,6 @@ function deserialize (buffer) {
 
   let data
   switch (type) {
-    case TYPE_ACK:
     case TYPE_RESPONSE:
     case TYPE_MESSAGE:
       data = {protocolData: readProtocolData(reader)}
@@ -284,7 +280,6 @@ function deserialize (buffer) {
 }
 
 module.exports = {
-  TYPE_ACK,
   TYPE_RESPONSE,
   TYPE_ERROR,
   TYPE_PREPARE,
@@ -305,13 +300,6 @@ module.exports = {
   // serialize/deserialize functionality. There is one such serialize* function per BTP call.
   // The arguments passed to them are aligned with the objects defined in the Ledger-Plugin-Interface (LPI),
   // which makes these functions convenient to use when working with LPI objects.
-  serializeAck (requestId, protocolData) {
-    return serialize({
-      type: TYPE_ACK,
-      requestId,
-      data: { protocolData }
-    })
-  },
   serializeResponse (requestId, protocolData) {
     return serialize({
       type: TYPE_RESPONSE,
