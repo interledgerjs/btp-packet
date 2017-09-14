@@ -182,9 +182,7 @@ function writeFulfill (writer, data) {
 
 function writeReject (writer, data) {
   const transferIdBuffer = Buffer.from(data.transferId.replace(/-/g, ''), 'hex')
-  const rejectionReasonBuffer = maybeSerializeIlpError(data.rejectionReason)
   writer.write(transferIdBuffer)
-  writer.write(rejectionReasonBuffer)
   writeProtocolData(writer, data.protocolData)
 }
 
@@ -251,9 +249,8 @@ function readFulfill (reader) {
 
 function readReject (reader) {
   const transferId = uuidParse.unparse(reader.read(16))
-  const rejectionReason = readIlpError(reader)
   const protocolData = readProtocolData(reader)
-  return { transferId, rejectionReason, protocolData }
+  return { transferId, protocolData }
 }
 
 function deserialize (buffer) {
@@ -363,13 +360,12 @@ module.exports = {
     })
   },
   serializeReject (reject, requestId, protocolData) {
-    const { transferId, rejectionReason } = reject
+    const { transferId } = reject
     return serialize({
       type: TYPE_REJECT,
       requestId,
       data: {
         transferId,
-        rejectionReason,
         protocolData
       }
     })
