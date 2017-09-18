@@ -6,18 +6,37 @@ const uuidParse = require('uuid-parse')
 const dateFormat = require('dateformat')
 const BigNumber = require('bignumber.js')
 
+// These constants are increased by 1 for BTP version Alpha
+const TYPE_ACK = 0 // only exists in BTP version Alpha
 const TYPE_RESPONSE = 1
 const TYPE_ERROR = 2
 const TYPE_PREPARE = 3
 const TYPE_FULFILL = 4
 const TYPE_REJECT = 5
 const TYPE_MESSAGE = 6
-const MIME_APPLICATION_OCTET_STRING = 0
+const MIME_APPLICATION_OCTET_STREAM = 0
 const MIME_TEXT_PLAIN_UTF8 = 1
 const MIME_APPLICATION_JSON = 2
+const BTP_VERSION_ALPHA = 0
+const BTP_VERSION_1 = 1
+
+function typeToVersion (type, btpVersion) {
+  if (btpVersion === BTP_VERSION_ALPHA) {
+    return type + 1
+  }
+  return type
+}
+
+function typeFromVersion (type, btpVersion) {
+  if (btpVersion === BTP_VERSION_ALPHA) {
+    return type - 1
+  }
+  return type
+}
 
 function typeToString (type) {
   switch (type) {
+    case TYPE_ACK: return 'TYPE_ACK'
     case TYPE_RESPONSE: return 'TYPE_RESPONSE'
     case TYPE_ERROR: return 'TYPE_ERROR'
     case TYPE_PREPARE: return 'TYPE_PREPARE'
@@ -83,6 +102,17 @@ function readGeneralizedTime (reader) {
   return new Date(date)
 }
 
+// TODO: move this function to the ilp-packet module, so we don't
+// have to parse the same data twice.
+function readIlpError (reader) {
+  const type = Buffer.from([ reader.readUInt8() ])
+  reader.bookmark()
+  const length = Buffer.from([ reader.readLengthPrefix() ])
+  reader.restore()
+  const contents = reader.readVarOctetString()
+  return Buffer.concat([ type, length, contents ])
+}
+
 function writeProtocolData (writer, protocolData) {
   if (!Array.isArray(protocolData)) {
     throw new Error('protocolData must be an array')
@@ -106,7 +136,6 @@ function readProtocolData (reader) {
   const lengthPrefixPrefix = reader.readUInt8()
   const lengthPrefix = reader.readUInt(lengthPrefixPrefix)
   const protocolData = []
-
   for (let i = 0; i < lengthPrefix; ++i) {
     const protocolName = reader.readVarOctetString().toString('ascii')
     const contentType = reader.readUInt8()
@@ -121,20 +150,24 @@ function readProtocolData (reader) {
   return protocolData
 }
 
-function writeError (writer, data) {
-  if (data.code.length !== 3) {
-    throw new Error(`error code must be 3 characters, got: "${data.code}"`)
+function writeError (writer, data, btpVersion = BTP_VERSION_1) {
+  if (btpVersion === BTP_VERSION_ALPHA) {
+    writer.write(data.rejectionReason)
+  } else {
+    if (data.code.length !== 3) {
+      throw new Error(`error code must be 3 characters, got: "${data.code}"`)
+    }
+
+    const codeBuffer = Buffer.from(data.code, 'ascii')
+    const nameBuffer = Buffer.from(data.name, 'ascii')
+    const triggeredAtBuffer = toGeneralizedTimeBuffer(data.triggeredAt)
+    const dataBuffer = Buffer.from(data.data, 'utf8')
+
+    writer.write(codeBuffer)
+    writer.writeVarOctetString(nameBuffer)
+    writer.writeVarOctetString(triggeredAtBuffer)
+    writer.writeVarOctetString(dataBuffer)
   }
-
-  const codeBuffer = Buffer.from(data.code, 'ascii')
-  const nameBuffer = Buffer.from(data.name, 'ascii')
-  const triggeredAtBuffer = toGeneralizedTimeBuffer(data.triggeredAt)
-  const dataBuffer = Buffer.from(data.data, 'utf8')
-
-  writer.write(codeBuffer)
-  writer.writeVarOctetString(nameBuffer)
-  writer.writeVarOctetString(triggeredAtBuffer)
-  writer.writeVarOctetString(dataBuffer)
   writeProtocolData(writer, data.protocolData)
 }
 
@@ -158,22 +191,30 @@ function writeFulfill (writer, data) {
   writeProtocolData(writer, data.protocolData)
 }
 
-function writeReject (writer, data) {
+function writeReject (writer, data, btpVersion = BTP_VERSION_1) {
   const transferIdBuffer = Buffer.from(data.transferId.replace(/-/g, ''), 'hex')
   writer.write(transferIdBuffer)
+  if (btpVersion === BTP_VERSION_ALPHA) {
+    writer.write(data.rejectionReason)
+  }
   writeProtocolData(writer, data.protocolData)
 }
 
-function serialize (obj) {
+function serialize (obj, btpVersion = BTP_VERSION_1) {
   const contentsWriter = new Writer()
   switch (obj.type) {
+    case TYPE_ACK:
     case TYPE_RESPONSE:
     case TYPE_MESSAGE:
-      writeProtocolData(contentsWriter, obj.data.protocolData) // see https://github.com/interledger/rfcs/issues/284
+      if (btpVersion === BTP_VERSION_ALPHA) {
+        writeProtocolData(contentsWriter, obj.data)
+      } else {
+        writeProtocolData(contentsWriter, obj.data.protocolData)
+      }
       break
 
     case TYPE_ERROR:
-      writeError(contentsWriter, obj.data)
+      writeError(contentsWriter, obj.data, btpVersion)
       break
 
     case TYPE_PREPARE:
@@ -185,7 +226,7 @@ function serialize (obj) {
       break
 
     case TYPE_REJECT:
-      writeReject(contentsWriter, obj.data)
+      writeReject(contentsWriter, obj.data, btpVersion)
       break
 
     default:
@@ -193,13 +234,22 @@ function serialize (obj) {
   }
 
   const envelopeWriter = new Writer()
-  envelopeWriter.writeUInt8(obj.type)
+  envelopeWriter.writeUInt8(typeToVersion(obj.type, btpVersion))
   envelopeWriter.writeUInt32(obj.requestId)
   envelopeWriter.writeVarOctetString(contentsWriter.getBuffer())
   return envelopeWriter.getBuffer()
 }
 
-function readError (reader) {
+function readError (reader, btpVersion = BTP_VERSION_1) {
+  if (btpVersion === BTP_VERSION_ALPHA) {
+    const rejectionReason = readIlpError(reader)
+    const protocolData = readProtocolData(reader)
+    return {
+      rejectionReason,
+      protocolData
+    }
+  }
+
   const code = reader.read(3).toString('ascii')
   const name = reader.readVarOctetString().toString('ascii')
   const triggeredAt = readGeneralizedTime(reader)
@@ -225,29 +275,38 @@ function readFulfill (reader) {
   return { transferId, fulfillment, protocolData }
 }
 
-function readReject (reader) {
+function readReject (reader, btpVersion = BTP_VERSION_1) {
   const transferId = uuidParse.unparse(reader.read(16))
+  if (btpVersion === BTP_VERSION_ALPHA) {
+    const rejectionReason = readIlpError(reader)
+    const protocolData = readProtocolData(reader)
+    return { transferId, rejectionReason, protocolData }
+  }
   const protocolData = readProtocolData(reader)
   return { transferId, protocolData }
 }
 
-function deserialize (buffer) {
+function deserialize (buffer, btpVersion = BTP_VERSION_1) {
   const envelopeReader = Reader.from(buffer)
 
-  const type = envelopeReader.readUInt8()
+  const type = typeFromVersion(envelopeReader.readUInt8(), btpVersion)
   const requestId = envelopeReader.readUInt32()
   const dataBuff = envelopeReader.readVarOctetString()
   const reader = new Reader(dataBuff)
-
   let data
   switch (type) {
+    case TYPE_ACK:
     case TYPE_RESPONSE:
     case TYPE_MESSAGE:
-      data = {protocolData: readProtocolData(reader)}
+      if (btpVersion === BTP_VERSION_ALPHA) {
+        data = readProtocolData(reader)
+      } else {
+        data = {protocolData: readProtocolData(reader)}
+      }
       break
 
     case TYPE_ERROR:
-      data = readError(reader)
+      data = readError(reader, btpVersion)
       break
 
     case TYPE_PREPARE:
@@ -259,7 +318,7 @@ function deserialize (buffer) {
       break
 
     case TYPE_REJECT:
-      data = readReject(reader)
+      data = readReject(reader, btpVersion)
       break
 
     default:
@@ -270,6 +329,7 @@ function deserialize (buffer) {
 }
 
 module.exports = {
+  TYPE_ACK,
   TYPE_RESPONSE,
   TYPE_ERROR,
   TYPE_PREPARE,
@@ -279,10 +339,13 @@ module.exports = {
 
   typeToString,
 
-  MIME_APPLICATION_OCTET_STREAM: MIME_APPLICATION_OCTET_STRING, // deprecated
-  MIME_APPLICATION_OCTET_STRING,
+  MIME_APPLICATION_OCTET_STREAM,
+  MIME_APPLICATION_OCTET_STRING: MIME_APPLICATION_OCTET_STREAM, // deprecated since https://github.com/interledger/rfcs/pull/291/files#diff-2c87a4d4e57dd9430f40e0fe2b4d295aR39
   MIME_TEXT_PLAIN_UTF8,
   MIME_APPLICATION_JSON,
+
+  BTP_VERSION_ALPHA,
+  BTP_VERSION_1,
 
   serialize,
   deserialize,
@@ -291,28 +354,35 @@ module.exports = {
   // serialize/deserialize functionality. There is one such serialize* function per BTP call.
   // The arguments passed to them are aligned with the objects defined in the Ledger-Plugin-Interface (LPI),
   // which makes these functions convenient to use when working with LPI objects.
-  serializeResponse (requestId, protocolData) {
+  serializeAck (requestId, protocolData) {
+    return serialize({
+      type: TYPE_ACK,
+      requestId,
+      data: protocolData
+    }, BTP_VERSION_ALPHA)
+  },
+  serializeResponse (requestId, protocolData, btpVersion = BTP_VERSION_1) {
     return serialize({
       type: TYPE_RESPONSE,
       requestId,
-      data: { protocolData }
-    })
+      data: (btpVersion === BTP_VERSION_ALPHA ? protocolData : { protocolData })
+    }, btpVersion)
   },
-  serializeError (error, requestId, protocolData) {
-    const { code, name, triggeredAt, data } = error
+  serializeError (error, requestId, protocolData, btpVersion = BTP_VERSION_1) {
+    let dataFields
+    if (btpVersion === BTP_VERSION_ALPHA) {
+      dataFields = { rejectionReason: error.rejectionReason, protocolData }
+    } else {
+      const { code, name, triggeredAt, data } = error
+      dataFields = { code, name, triggeredAt, data, protocolData }
+    }
     return serialize({
       type: TYPE_ERROR,
       requestId,
-      data: {
-        code,
-        name,
-        triggeredAt,
-        data,
-        protocolData
-      }
-    })
+      data: dataFields
+    }, btpVersion)
   },
-  serializePrepare (transfer, requestId, protocolData) {
+  serializePrepare (transfer, requestId, protocolData, btpVersion = BTP_VERSION_1) {
     const { transferId, amount, executionCondition, expiresAt } = transfer
     return serialize({
       type: TYPE_PREPARE,
@@ -324,9 +394,9 @@ module.exports = {
         expiresAt,
         protocolData
       }
-    })
+    }, btpVersion)
   },
-  serializeFulfill (fulfill, requestId, protocolData) {
+  serializeFulfill (fulfill, requestId, protocolData, btpVersion = BTP_VERSION_1) {
     const { transferId, fulfillment } = fulfill
     return serialize({
       type: TYPE_FULFILL,
@@ -336,24 +406,24 @@ module.exports = {
         fulfillment,
         protocolData
       }
-    })
+    }, btpVersion)
   },
-  serializeReject (reject, requestId, protocolData) {
-    const { transferId } = reject
+  serializeReject (reject, requestId, protocolData, btpVersion = BTP_VERSION_1) {
+    let data = { transferId: reject.transferId, protocolData }
+    if (btpVersion === BTP_VERSION_ALPHA) {
+      data.rejectionReason = reject.rejectionReason
+    }
     return serialize({
       type: TYPE_REJECT,
       requestId,
-      data: {
-        transferId,
-        protocolData
-      }
-    })
+      data
+    }, btpVersion)
   },
-  serializeMessage (requestId, protocolData) {
+  serializeMessage (requestId, protocolData, btpVersion = BTP_VERSION_1) {
     return serialize({
       type: TYPE_MESSAGE,
       requestId,
-      data: { protocolData }
-    })
+      data: (btpVersion === BTP_VERSION_ALPHA ? protocolData : { protocolData })
+    }, btpVersion)
   }
 }

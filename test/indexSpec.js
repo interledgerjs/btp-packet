@@ -5,7 +5,7 @@ const assert = require('chai').assert
 const IlpPacket = require('ilp-packet')
 const base64url = require('base64url')
 
-describe('Bilateral Transfer Protocol', () => {
+describe('BTP/1.0', () => {
   beforeEach(function () {
     this.ilpPacket = IlpPacket.serializeIlpPayment({
       account: 'example.red.alice',
