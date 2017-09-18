@@ -32,7 +32,7 @@ describe('Bilateral Transfer Protocol', () => {
     }
 
     this.reject = {
-      transferId: this.transfer.transferId,
+      transferId: this.transfer.transferId
     }
 
     this.btpError = {
@@ -147,7 +147,7 @@ describe('Bilateral Transfer Protocol', () => {
         requestId: 1,
         data: {
           protocolData: this.protocolData,
-          transferId: this.fulfill.transferId,
+          transferId: this.fulfill.transferId
         }
       }
       assert.deepEqual(Btp.serialize(obj), this.buffers.reject)

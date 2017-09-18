@@ -5,7 +5,6 @@ const base64url = require('base64url')
 const uuidParse = require('uuid-parse')
 const dateFormat = require('dateformat')
 const BigNumber = require('bignumber.js')
-const { serializeIlpError } = require('ilp-packet')
 
 const TYPE_RESPONSE = 1
 const TYPE_ERROR = 2
@@ -82,27 +81,6 @@ function readGeneralizedTime (reader) {
     '$1-$2-$3T$4:$5:$6')
 
   return new Date(date)
-}
-
-function maybeSerializeIlpError (error) {
-  if (Buffer.isBuffer(error)) {
-    return error
-  }
-  if (typeof error === 'string') {
-    return Buffer.from(error, 'base64')
-  }
-  return serializeIlpError(error)
-}
-
-// TODO: move this function to the ilp-packet module, so we don't
-// have to parse the same data twice.
-function readIlpError (reader) {
-  const type = Buffer.from([ reader.readUInt8() ])
-  reader.bookmark()
-  const length = Buffer.from([ reader.readLengthPrefix() ])
-  reader.restore()
-  const contents = reader.readVarOctetString()
-  return base64url(Buffer.concat([ type, length, contents ]))
 }
 
 function writeProtocolData (writer, protocolData) {
