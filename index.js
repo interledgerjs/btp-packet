@@ -160,7 +160,7 @@ function writeTransfer (writer, data, btpVersion = BTP_VERSION_1_1) {
 
   const amountAsPair = stringToTwoNumbers(data.amount)
   writer.writeUInt64(amountAsPair)
-  writer.writeProtocolData(writer, data.protocolData)
+  writeProtocolData(writer, data.protocolData)
 }
 
 function writeError (writer, data, btpVersion = BTP_VERSION_1) {
@@ -213,7 +213,7 @@ function writeReject (writer, data, btpVersion = BTP_VERSION_1) {
   writeProtocolData(writer, data.protocolData)
 }
 
-function serialize (obj, btpVersion = BTP_VERSION_1) {
+function serialize (obj, btpVersion = BTP_VERSION_1_1) {
   const contentsWriter = new Writer()
   switch (obj.type) {
     case TYPE_ACK:
@@ -313,7 +313,7 @@ function readReject (reader, btpVersion = BTP_VERSION_1) {
   return { transferId, protocolData }
 }
 
-function deserialize (buffer, btpVersion = BTP_VERSION_1) {
+function deserialize (buffer, btpVersion = BTP_VERSION_1_1) {
   const envelopeReader = Reader.from(buffer)
 
   const type = typeFromVersion(envelopeReader.readUInt8(), btpVersion)
