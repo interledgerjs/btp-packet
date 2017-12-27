@@ -14,11 +14,13 @@ const TYPE_PREPARE = 3
 const TYPE_FULFILL = 4
 const TYPE_REJECT = 5
 const TYPE_MESSAGE = 6
+const TYPE_TRANSFER = 7
 const MIME_APPLICATION_OCTET_STREAM = 0
 const MIME_TEXT_PLAIN_UTF8 = 1
 const MIME_APPLICATION_JSON = 2
 const BTP_VERSION_ALPHA = 0
 const BTP_VERSION_1 = 1
+const BTP_VERSION_1_1 = 2
 
 function typeToVersion (type, btpVersion) {
   if (btpVersion === BTP_VERSION_ALPHA) {
@@ -43,6 +45,7 @@ function typeToString (type) {
     case TYPE_FULFILL: return 'TYPE_FULFILL'
     case TYPE_REJECT: return 'TYPE_REJECT'
     case TYPE_MESSAGE: return 'TYPE_MESSAGE'
+    case TYPE_TRANSFER: return 'TYPE_TRANSFER'
     default: throw new Error('Unrecognized BTP packet type')
   }
 }
@@ -150,6 +153,16 @@ function readProtocolData (reader) {
   return protocolData
 }
 
+function writeTransfer (writer, data, btpVersion = BTP_VERSION_1_1) {
+  if (btpVersion < BTP_VERSION_1_1) {
+    throw new Error('TYPE_TRANSFER does not exist in earlier version than 1.1')
+  }
+
+  const amountAsPair = stringToTwoNumbers(data.amount)
+  writer.writeUInt64(amountAsPair)
+  writeProtocolData(writer, data.protocolData)
+}
+
 function writeError (writer, data, btpVersion = BTP_VERSION_1) {
   if (btpVersion === BTP_VERSION_ALPHA) {
     writer.write(data.rejectionReason)
@@ -200,7 +213,7 @@ function writeReject (writer, data, btpVersion = BTP_VERSION_1) {
   writeProtocolData(writer, data.protocolData)
 }
 
-function serialize (obj, btpVersion = BTP_VERSION_1) {
+function serialize (obj, btpVersion = BTP_VERSION_1_1) {
   const contentsWriter = new Writer()
   switch (obj.type) {
     case TYPE_ACK:
@@ -211,6 +224,10 @@ function serialize (obj, btpVersion = BTP_VERSION_1) {
       } else {
         writeProtocolData(contentsWriter, obj.data.protocolData)
       }
+      break
+
+    case TYPE_TRANSFER:
+      writeTransfer(contentsWriter, obj.data, btpVersion)
       break
 
     case TYPE_ERROR:
@@ -238,6 +255,16 @@ function serialize (obj, btpVersion = BTP_VERSION_1) {
   envelopeWriter.writeUInt32(obj.requestId)
   envelopeWriter.writeVarOctetString(contentsWriter.getBuffer())
   return envelopeWriter.getBuffer()
+}
+
+function readTransfer (reader, btpVersion = BTP_VERSION_1_1) {
+  if (btpVersion < BTP_VERSION_1_1) {
+    throw new Error('TYPE_TRANSFER does not exist in earlier version than 1.1')
+  }
+
+  const amount = twoNumbersToString(reader.readUInt64())
+  const protocolData = readProtocolData(reader)
+  return { amount, protocolData }
 }
 
 function readError (reader, btpVersion = BTP_VERSION_1) {
@@ -286,7 +313,7 @@ function readReject (reader, btpVersion = BTP_VERSION_1) {
   return { transferId, protocolData }
 }
 
-function deserialize (buffer, btpVersion = BTP_VERSION_1) {
+function deserialize (buffer, btpVersion = BTP_VERSION_1_1) {
   const envelopeReader = Reader.from(buffer)
 
   const type = typeFromVersion(envelopeReader.readUInt8(), btpVersion)
@@ -303,6 +330,10 @@ function deserialize (buffer, btpVersion = BTP_VERSION_1) {
       } else {
         data = {protocolData: readProtocolData(reader)}
       }
+      break
+
+    case TYPE_TRANSFER:
+      data = readTransfer(reader, btpVersion)
       break
 
     case TYPE_ERROR:
@@ -336,6 +367,7 @@ module.exports = {
   TYPE_FULFILL,
   TYPE_REJECT,
   TYPE_MESSAGE,
+  TYPE_TRANSFER,
 
   typeToString,
 
@@ -424,6 +456,20 @@ module.exports = {
       type: TYPE_MESSAGE,
       requestId,
       data: (btpVersion === BTP_VERSION_ALPHA ? protocolData : { protocolData })
+    }, btpVersion)
+  },
+  serializeTransfer (transfer, requestId, protocolData, btpVersion = BTP_VERSION_1_1) {
+    if (btpVersion < BTP_VERSION_1_1) {
+      throw new Error('TYPE_TRANSFER does not exist in earlier version than 1.1')
+    }
+    const { amount } = transfer
+    return serialize({
+      type: TYPE_TRANSFER,
+      requestId,
+      data: {
+        amount,
+        protocolData
+      }
     }, btpVersion)
   }
 }
