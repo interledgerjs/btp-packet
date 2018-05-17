@@ -1,7 +1,6 @@
 'use strict'
 
 const { Reader, Writer } = require('oer-utils')
-const base64url = require('base64url')
 const uuidParse = require('uuid-parse')
 const dateFormat = require('dateformat')
 const BigNumber = require('bignumber.js')
@@ -90,6 +89,13 @@ function stringToTwoNumbers (num) {
     uint64.dividedToIntegerBy(HIGH_WORD_MULTIPLIER).toNumber(),
     uint64.modulo(HIGH_WORD_MULTIPLIER).toNumber()
   ]
+}
+
+function base64url (input) {
+  return input.toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
 }
 
 function toGeneralizedTimeBuffer (date) {
@@ -370,6 +376,7 @@ module.exports = {
   TYPE_TRANSFER,
 
   typeToString,
+  base64url,
 
   MIME_APPLICATION_OCTET_STREAM,
   MIME_APPLICATION_OCTET_STRING: MIME_APPLICATION_OCTET_STREAM, // deprecated since https://github.com/interledger/rfcs/pull/291/files#diff-2c87a4d4e57dd9430f40e0fe2b4d295aR39
