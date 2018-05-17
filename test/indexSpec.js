@@ -3,7 +3,6 @@
 const Btp = require('..')
 const assert = require('chai').assert
 const IlpPacket = require('ilp-packet')
-const base64url = require('base64url')
 
 describe('BTP/1.0', () => {
   beforeEach(function () {
@@ -22,13 +21,13 @@ describe('BTP/1.0', () => {
     this.transfer = {
       transferId: 'b4c838f6-80b1-47f8-a82e-b1fcfbed89d5',
       amount: '1000',
-      executionCondition: base64url(Buffer.from([219, 42, 249, 249, 219, 166, 255, 52, 179, 237, 173, 251, 152, 107, 155, 180, 205, 75, 75, 65, 229, 4, 65, 25, 197, 93, 52, 175, 218, 191, 252, 2])),
+      executionCondition: Btp.base64url(Buffer.from([219, 42, 249, 249, 219, 166, 255, 52, 179, 237, 173, 251, 152, 107, 155, 180, 205, 75, 75, 65, 229, 4, 65, 25, 197, 93, 52, 175, 218, 191, 252, 2])),
       expiresAt: new Date('2017-08-28T09:32:00.000Z')
     }
 
     this.fulfill = {
       transferId: this.transfer.transferId,
-      fulfillment: base64url(Buffer.from([219, 42, 249, 249, 219, 166, 255, 52, 179, 237, 173, 251, 152, 107, 155, 180, 205, 75, 75, 65, 229, 4, 65, 25, 197, 93, 52, 175, 218, 191, 252, 2]))
+      fulfillment: Btp.base64url(Buffer.from([219, 42, 249, 249, 219, 166, 255, 52, 179, 237, 173, 251, 152, 107, 155, 180, 205, 75, 75, 65, 229, 4, 65, 25, 197, 93, 52, 175, 218, 191, 252, 2]))
     }
 
     this.reject = {
