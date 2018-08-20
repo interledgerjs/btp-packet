@@ -25,15 +25,6 @@ describe('BTP/1.0', () => {
       expiresAt: new Date('2017-08-28T09:32:00.000Z')
     }
 
-    this.fulfill = {
-      transferId: this.transfer.transferId,
-      fulfillment: Btp.base64url(Buffer.from([219, 42, 249, 249, 219, 166, 255, 52, 179, 237, 173, 251, 152, 107, 155, 180, 205, 75, 75, 65, 229, 4, 65, 25, 197, 93, 52, 175, 218, 191, 252, 2]))
-    }
-
-    this.reject = {
-      transferId: this.transfer.transferId
-    }
-
     this.btpError = {
       code: 'L13',
       name: 'errorName',
@@ -55,10 +46,6 @@ describe('BTP/1.0', () => {
     this.buffers = {
       response: Buffer.from([1, 0, 0, 0, 1, 67, 1, 4, 3, 105, 108, 112, 0, 30, 1, 28, 0, 0, 0, 0, 0, 0, 0, 100, 17, 101, 120, 97, 109, 112, 108, 101, 46, 114, 101, 100, 46, 97, 108, 105, 99, 101, 0, 0, 3, 102, 111, 111, 0, 3, 98, 97, 114, 4, 98, 101, 101, 112, 1, 4, 98, 111, 111, 112, 4, 106, 115, 111, 110, 2, 2, 123, 125]),
       error: Buffer.from([2, 0, 0, 0, 1, 104, 76, 49, 51, 9, 101, 114, 114, 111, 114, 78, 97, 109, 101, 19, 50, 48, 49, 55, 48, 56, 50, 56, 49, 56, 51, 50, 48, 48, 46, 48, 48, 48, 90, 3, 98, 111, 111, 1, 4, 3, 105, 108, 112, 0, 30, 1, 28, 0, 0, 0, 0, 0, 0, 0, 100, 17, 101, 120, 97, 109, 112, 108, 101, 46, 114, 101, 100, 46, 97, 108, 105, 99, 101, 0, 0, 3, 102, 111, 111, 0, 3, 98, 97, 114, 4, 98, 101, 101, 112, 1, 4, 98, 111, 111, 112, 4, 106, 115, 111, 110, 2, 2, 123, 125]),
-      prepare1: Buffer.from([3, 0, 0, 0, 1, 129, 143, 180, 200, 56, 246, 128, 177, 71, 248, 168, 46, 177, 252, 251, 237, 137, 213, 0, 0, 0, 0, 0, 0, 3, 232, 219, 42, 249, 249, 219, 166, 255, 52, 179, 237, 173, 251, 152, 107, 155, 180, 205, 75, 75, 65, 229, 4, 65, 25, 197, 93, 52, 175, 218, 191, 252, 2, 19, 50, 48, 49, 55, 48, 56, 50, 56, 48, 57, 51, 50, 48, 48, 46, 48, 48, 48, 90, 1, 4, 3, 105, 108, 112, 0, 30, 1, 28, 0, 0, 0, 0, 0, 0, 0, 100, 17, 101, 120, 97, 109, 112, 108, 101, 46, 114, 101, 100, 46, 97, 108, 105, 99, 101, 0, 0, 3, 102, 111, 111, 0, 3, 98, 97, 114, 4, 98, 101, 101, 112, 1, 4, 98, 111, 111, 112, 4, 106, 115, 111, 110, 2, 2, 123, 125]),
-      prepare2: Buffer.from([3, 0, 0, 0, 1, 129, 143, 180, 200, 56, 246, 128, 177, 71, 248, 168, 46, 177, 252, 251, 237, 137, 213, 0, 0, 1, 31, 113, 251, 4, 203, 219, 42, 249, 249, 219, 166, 255, 52, 179, 237, 173, 251, 152, 107, 155, 180, 205, 75, 75, 65, 229, 4, 65, 25, 197, 93, 52, 175, 218, 191, 252, 2, 19, 50, 48, 49, 55, 48, 56, 50, 56, 48, 57, 51, 50, 48, 48, 46, 48, 48, 48, 90, 1, 4, 3, 105, 108, 112, 0, 30, 1, 28, 0, 0, 0, 0, 0, 0, 0, 100, 17, 101, 120, 97, 109, 112, 108, 101, 46, 114, 101, 100, 46, 97, 108, 105, 99, 101, 0, 0, 3, 102, 111, 111, 0, 3, 98, 97, 114, 4, 98, 101, 101, 112, 1, 4, 98, 111, 111, 112, 4, 106, 115, 111, 110, 2, 2, 123, 125]),
-      fulfill: Buffer.from([4, 0, 0, 0, 1, 115, 180, 200, 56, 246, 128, 177, 71, 248, 168, 46, 177, 252, 251, 237, 137, 213, 219, 42, 249, 249, 219, 166, 255, 52, 179, 237, 173, 251, 152, 107, 155, 180, 205, 75, 75, 65, 229, 4, 65, 25, 197, 93, 52, 175, 218, 191, 252, 2, 1, 4, 3, 105, 108, 112, 0, 30, 1, 28, 0, 0, 0, 0, 0, 0, 0, 100, 17, 101, 120, 97, 109, 112, 108, 101, 46, 114, 101, 100, 46, 97, 108, 105, 99, 101, 0, 0, 3, 102, 111, 111, 0, 3, 98, 97, 114, 4, 98, 101, 101, 112, 1, 4, 98, 111, 111, 112, 4, 106, 115, 111, 110, 2, 2, 123, 125]),
-      reject: Buffer.from([5, 0, 0, 0, 1, 83, 180, 200, 56, 246, 128, 177, 71, 248, 168, 46, 177, 252, 251, 237, 137, 213, 1, 4, 3, 105, 108, 112, 0, 30, 1, 28, 0, 0, 0, 0, 0, 0, 0, 100, 17, 101, 120, 97, 109, 112, 108, 101, 46, 114, 101, 100, 46, 97, 108, 105, 99, 101, 0, 0, 3, 102, 111, 111, 0, 3, 98, 97, 114, 4, 98, 101, 101, 112, 1, 4, 98, 111, 111, 112, 4, 106, 115, 111, 110, 2, 2, 123, 125]),
       message: Buffer.from([6, 0, 0, 0, 1, 67, 1, 4, 3, 105, 108, 112, 0, 30, 1, 28, 0, 0, 0, 0, 0, 0, 0, 100, 17, 101, 120, 97, 109, 112, 108, 101, 46, 114, 101, 100, 46, 97, 108, 105, 99, 101, 0, 0, 3, 102, 111, 111, 0, 3, 98, 97, 114, 4, 98, 101, 101, 112, 1, 4, 98, 111, 111, 112, 4, 106, 115, 111, 110, 2, 2, 123, 125]),
       transfer: Buffer.from([7, 0, 0, 0, 1, 75, 0, 0, 0, 0, 0, 0, 0, 100, 1, 4, 3, 105, 108, 112, 0, 30, 1, 28, 0, 0, 0, 0, 0, 0, 0, 100, 17, 101, 120, 97, 109, 112, 108, 101, 46, 114, 101, 100, 46, 97, 108, 105, 99, 101, 0, 0, 3, 102, 111, 111, 0, 3, 98, 97, 114, 4, 98, 101, 101, 112, 1, 4, 98, 111, 111, 112, 4, 106, 115, 111, 110, 2, 2, 123, 125])
     }
@@ -87,71 +74,6 @@ describe('BTP/1.0', () => {
       }
       assert.deepEqual(Btp.serialize(obj), this.buffers.error)
       assert.deepEqual(Btp.deserialize(this.buffers.error), obj)
-    })
-  })
-
-  describe('Prepare', () => {
-    it('should serialize/deserialize without losing data', function () {
-      const obj = {
-        type: Btp.TYPE_PREPARE,
-        requestId: 1,
-        data: {
-          protocolData: this.protocolData,
-          transferId: this.transfer.transferId,
-          amount: this.transfer.amount,
-          expiresAt: this.transfer.expiresAt,
-          executionCondition: this.transfer.executionCondition
-        }
-      }
-      assert.deepEqual(Btp.serialize(obj), this.buffers.prepare1)
-      assert.deepEqual(Btp.deserialize(this.buffers.prepare1), obj)
-    })
-
-    it('should serialize/deserialize 64-bit amount without losing precision', function () {
-      const obj = {
-        type: Btp.TYPE_PREPARE,
-        requestId: 1,
-        data: {
-          protocolData: this.protocolData,
-          transferId: this.transfer.transferId,
-          amount: '1234567890123',
-          expiresAt: this.transfer.expiresAt,
-          executionCondition: this.transfer.executionCondition
-        }
-      }
-      assert.deepEqual(Btp.serialize(obj), this.buffers.prepare2)
-      assert.deepEqual(Btp.deserialize(this.buffers.prepare2), obj)
-    })
-  })
-
-  describe('Fulfill', () => {
-    it('should serialize/deserialize without losing data', function () {
-      const obj = {
-        type: Btp.TYPE_FULFILL,
-        requestId: 1,
-        data: {
-          protocolData: this.protocolData,
-          transferId: this.fulfill.transferId,
-          fulfillment: this.fulfill.fulfillment
-        }
-      }
-      assert.deepEqual(Btp.serialize(obj), this.buffers.fulfill)
-      assert.deepEqual(Btp.deserialize(this.buffers.fulfill), obj)
-    })
-  })
-
-  describe('Reject', () => {
-    it('should serialize/deserialize without losing data', function () {
-      const obj = {
-        type: Btp.TYPE_REJECT,
-        requestId: 1,
-        data: {
-          protocolData: this.protocolData,
-          transferId: this.fulfill.transferId
-        }
-      }
-      assert.deepEqual(Btp.serialize(obj), this.buffers.reject)
-      assert.deepEqual(Btp.deserialize(this.buffers.reject), obj)
     })
   })
 
@@ -195,34 +117,6 @@ describe('BTP/1.0', () => {
     it('should serialize without losing data', function () {
       const buf = Btp.serializeError(this.btpError, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.error)
-    })
-  })
-
-  describe('serializePrepare', () => {
-    it('should serialize without losing data', function () {
-      const buf = Btp.serializePrepare(this.transfer, 1, this.protocolData)
-      assert.deepEqual(buf, this.buffers.prepare1)
-    })
-
-    it('should serialize 64-bit amount without losing precision', function () {
-      this.transfer.amount = '1234567890123'
-
-      const buf = Btp.serializePrepare(this.transfer, 1, this.protocolData)
-      assert.deepEqual(buf, this.buffers.prepare2)
-    })
-  })
-
-  describe('serializeFulfill', () => {
-    it('should serialize without losing data', function () {
-      const buf = Btp.serializeFulfill(this.fulfill, 1, this.protocolData)
-      assert.deepEqual(buf, this.buffers.fulfill)
-    })
-  })
-
-  describe('serializeReject', () => {
-    it('should serialize without losing data', function () {
-      const buf = Btp.serializeReject(this.reject, 1, this.protocolData)
-      assert.deepEqual(buf, this.buffers.reject)
     })
   })
 
