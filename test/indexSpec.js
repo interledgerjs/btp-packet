@@ -2,17 +2,11 @@
 
 const Btp = require('..')
 const assert = require('chai').assert
-const IlpPacket = require('ilp-packet')
 
 describe('BTP/1.0', () => {
   beforeEach(function () {
-    this.ilpPacket = IlpPacket.serializeIlpPayment({
-      account: 'example.red.alice',
-      amount: '100'
-    })
-
     this.protocolData = [
-      { protocolName: 'ilp', contentType: Btp.MIME_APPLICATION_OCTET_STREAM, data: this.ilpPacket },
+      { protocolName: 'ilp', contentType: Btp.MIME_APPLICATION_OCTET_STREAM, data: Buffer.from([]) },
       { protocolName: 'foo', contentType: Btp.MIME_APPLICATION_OCTET_STREAM, data: Buffer.from('bar') },
       { protocolName: 'beep', contentType: Btp.MIME_TEXT_PLAIN_UTF8, data: Buffer.from('boop') },
       { protocolName: 'json', contentType: Btp.MIME_APPLICATION_JSON, data: Buffer.from('{}') }
@@ -33,21 +27,11 @@ describe('BTP/1.0', () => {
       protocolData: this.protocolData
     }
 
-    this.error = {
-      code: 'L13',
-      name: 'errorName',
-      triggeredBy: 'peer.',
-      forwardedBy: ['die da', 'die da', 'die da'],
-      triggeredAt: new Date('2017-08-28T09:32:00.000Z'),
-      data: 'boo'
-    }
-    this.errorBuf = IlpPacket.serializeIlpError(this.error)
-    this.errorStr = this.errorBuf.toString('base64')
     this.buffers = {
-      response: Buffer.from([1, 0, 0, 0, 1, 67, 1, 4, 3, 105, 108, 112, 0, 30, 1, 28, 0, 0, 0, 0, 0, 0, 0, 100, 17, 101, 120, 97, 109, 112, 108, 101, 46, 114, 101, 100, 46, 97, 108, 105, 99, 101, 0, 0, 3, 102, 111, 111, 0, 3, 98, 97, 114, 4, 98, 101, 101, 112, 1, 4, 98, 111, 111, 112, 4, 106, 115, 111, 110, 2, 2, 123, 125]),
-      error: Buffer.from([2, 0, 0, 0, 1, 104, 76, 49, 51, 9, 101, 114, 114, 111, 114, 78, 97, 109, 101, 19, 50, 48, 49, 55, 48, 56, 50, 56, 49, 56, 51, 50, 48, 48, 46, 48, 48, 48, 90, 3, 98, 111, 111, 1, 4, 3, 105, 108, 112, 0, 30, 1, 28, 0, 0, 0, 0, 0, 0, 0, 100, 17, 101, 120, 97, 109, 112, 108, 101, 46, 114, 101, 100, 46, 97, 108, 105, 99, 101, 0, 0, 3, 102, 111, 111, 0, 3, 98, 97, 114, 4, 98, 101, 101, 112, 1, 4, 98, 111, 111, 112, 4, 106, 115, 111, 110, 2, 2, 123, 125]),
-      message: Buffer.from([6, 0, 0, 0, 1, 67, 1, 4, 3, 105, 108, 112, 0, 30, 1, 28, 0, 0, 0, 0, 0, 0, 0, 100, 17, 101, 120, 97, 109, 112, 108, 101, 46, 114, 101, 100, 46, 97, 108, 105, 99, 101, 0, 0, 3, 102, 111, 111, 0, 3, 98, 97, 114, 4, 98, 101, 101, 112, 1, 4, 98, 111, 111, 112, 4, 106, 115, 111, 110, 2, 2, 123, 125]),
-      transfer: Buffer.from([7, 0, 0, 0, 1, 75, 0, 0, 0, 0, 0, 0, 0, 100, 1, 4, 3, 105, 108, 112, 0, 30, 1, 28, 0, 0, 0, 0, 0, 0, 0, 100, 17, 101, 120, 97, 109, 112, 108, 101, 46, 114, 101, 100, 46, 97, 108, 105, 99, 101, 0, 0, 3, 102, 111, 111, 0, 3, 98, 97, 114, 4, 98, 101, 101, 112, 1, 4, 98, 111, 111, 112, 4, 106, 115, 111, 110, 2, 2, 123, 125])
+      response: Buffer.from([1, 0, 0, 0, 1, 37, 1, 4, 3, 105, 108, 112, 0, 0, 3, 102, 111, 111, 0, 3, 98, 97, 114, 4, 98, 101, 101, 112, 1, 4, 98, 111, 111, 112, 4, 106, 115, 111, 110, 2, 2, 123, 125]),
+      error: Buffer.from([2, 0, 0, 0, 1, 74, 76, 49, 51, 9, 101, 114, 114, 111, 114, 78, 97, 109, 101, 19, 50, 48, 49, 55, 48, 56, 50, 56, 49, 56, 51, 50, 48, 48, 46, 48, 48, 48, 90, 3, 98, 111, 111, 1, 4, 3, 105, 108, 112, 0, 0, 3, 102, 111, 111, 0, 3, 98, 97, 114, 4, 98, 101, 101, 112, 1, 4, 98, 111, 111, 112, 4, 106, 115, 111, 110, 2, 2, 123, 125]),
+      message: Buffer.from([6, 0, 0, 0, 1, 37, 1, 4, 3, 105, 108, 112, 0, 0, 3, 102, 111, 111, 0, 3, 98, 97, 114, 4, 98, 101, 101, 112, 1, 4, 98, 111, 111, 112, 4, 106, 115, 111, 110, 2, 2, 123, 125]),
+      transfer: Buffer.from([7, 0, 0, 0, 1, 45, 0, 0, 0, 0, 0, 0, 0, 100, 1, 4, 3, 105, 108, 112, 0, 0, 3, 102, 111, 111, 0, 3, 98, 97, 114, 4, 98, 101, 101, 112, 1, 4, 98, 111, 111, 112, 4, 106, 115, 111, 110, 2, 2, 123, 125])
     }
   })
 
