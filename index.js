@@ -166,7 +166,7 @@ function deserialize (buffer) {
   switch (type) {
     case TYPE_RESPONSE:
     case TYPE_MESSAGE:
-      data = {protocolData: readProtocolData(reader)}
+      data = { protocolData: readProtocolData(reader) }
       break
 
     case TYPE_TRANSFER:
