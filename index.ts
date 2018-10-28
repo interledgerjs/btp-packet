@@ -1,5 +1,4 @@
 import {Reader, Writer} from 'oer-utils'
-import * as assert from 'assert'
 const dateFormat = require('dateformat')
 import BigNumber from 'bignumber.js'
 
