@@ -6,10 +6,10 @@ const assert = require('chai').assert
 describe('BTP/1.0', () => {
   beforeEach(function () {
     this.protocolData = [
-      { protocolName: 'ilp', contentType: Btp.MIME_APPLICATION_OCTET_STREAM, data: Buffer.from([]) },
-      { protocolName: 'foo', contentType: Btp.MIME_APPLICATION_OCTET_STREAM, data: Buffer.from('bar') },
-      { protocolName: 'beep', contentType: Btp.MIME_TEXT_PLAIN_UTF8, data: Buffer.from('boop') },
-      { protocolName: 'json', contentType: Btp.MIME_APPLICATION_JSON, data: Buffer.from('{}') }
+      { protocolName: 'ilp', contentType: Btp.MimeType.MIME_APPLICATION_OCTET_STREAM, data: Buffer.from([]) },
+      { protocolName: 'foo', contentType: Btp.MimeType.MIME_APPLICATION_OCTET_STREAM, data: Buffer.from('bar') },
+      { protocolName: 'beep', contentType: Btp.MimeType.MIME_TEXT_PLAIN_UTF8, data: Buffer.from('boop') },
+      { protocolName: 'json', contentType: Btp.MimeType.MIME_APPLICATION_JSON, data: Buffer.from('{}') }
     ]
 
     this.transfer = {
@@ -38,7 +38,7 @@ describe('BTP/1.0', () => {
   describe('Response', () => {
     it('should serialize/deserialize without losing data', function () {
       const obj = {
-        type: Btp.TYPE_RESPONSE,
+        type: Btp.Type.TYPE_RESPONSE,
         requestId: 1,
         data: {
           protocolData: this.protocolData
@@ -52,7 +52,7 @@ describe('BTP/1.0', () => {
   describe('Error', () => {
     it('should serialize/deserialize without losing data', function () {
       const obj = {
-        type: Btp.TYPE_ERROR,
+        type: Btp.Type.TYPE_ERROR,
         requestId: 1,
         data: this.btpError
       }
@@ -64,7 +64,7 @@ describe('BTP/1.0', () => {
   describe('Message', () => {
     it('should serialize/deserialize without losing data', function () {
       const obj = {
-        type: Btp.TYPE_MESSAGE,
+        type: Btp.Type.TYPE_MESSAGE,
         requestId: 1,
         data: {
           protocolData: this.protocolData
@@ -78,7 +78,7 @@ describe('BTP/1.0', () => {
   describe('Transfer', () => {
     it('should serialize/deserialize without losing data', function () {
       const obj = {
-        type: Btp.TYPE_TRANSFER,
+        type: Btp.Type.TYPE_TRANSFER,
         requestId: 1,
         data: {
           amount: '100',
