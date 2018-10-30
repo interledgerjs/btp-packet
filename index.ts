@@ -83,12 +83,12 @@ function writeProtocolData (writer: Writer, protocolData: ProtocolData[]) {
 }
 
 function readProtocolData (reader: Reader) {
-  const lengthPrefixPrefix = +reader.readUInt8()
-  const lengthPrefix = +reader.readUInt(lengthPrefixPrefix)
+  const lengthPrefixPrefix = reader.readUInt8Number()
+  const lengthPrefix = reader.readUIntNumber(lengthPrefixPrefix)
   const protocolData = []
   for (let i = 0; i < lengthPrefix; ++i) {
     const protocolName = reader.readVarOctetString().toString('ascii')
-    const contentType = +reader.readUInt8()
+    const contentType = reader.readUInt8Number()
     const data = reader.readVarOctetString()
     protocolData.push({
       protocolName,
@@ -212,8 +212,8 @@ function readError (reader: Reader) {
 export function deserialize (buffer: Buffer) {
   const envelopeReader = Reader.from(buffer)
 
-  const type = +envelopeReader.readUInt8()
-  const requestId = +envelopeReader.readUInt32()
+  const type = envelopeReader.readUInt8Number()
+  const requestId = envelopeReader.readUInt32Number()
   const dataBuff = envelopeReader.readVarOctetString()
   const reader = new Reader(dataBuff)
   let data
