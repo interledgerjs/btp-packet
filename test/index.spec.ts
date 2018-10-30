@@ -1,7 +1,5 @@
-'use strict'
-
-const Btp = require('..')
-const assert = require('chai').assert
+import * as Btp from '..'
+import { assert } from 'chai'
 
 describe('BTP/1.0', () => {
   beforeEach(function () {
@@ -37,7 +35,7 @@ describe('BTP/1.0', () => {
 
   describe('Response', () => {
     it('should serialize/deserialize without losing data', function () {
-      const obj = {
+      const obj: Btp.BtpPacket = {
         type: Btp.TYPE_RESPONSE,
         requestId: 1,
         data: {
@@ -51,7 +49,7 @@ describe('BTP/1.0', () => {
 
   describe('Error', () => {
     it('should serialize/deserialize without losing data', function () {
-      const obj = {
+      const obj: Btp.BtpPacket = {
         type: Btp.TYPE_ERROR,
         requestId: 1,
         data: this.btpError
@@ -63,7 +61,7 @@ describe('BTP/1.0', () => {
 
   describe('Message', () => {
     it('should serialize/deserialize without losing data', function () {
-      const obj = {
+      const obj: Btp.BtpPacket = {
         type: Btp.TYPE_MESSAGE,
         requestId: 1,
         data: {
@@ -77,7 +75,7 @@ describe('BTP/1.0', () => {
 
   describe('Transfer', () => {
     it('should serialize/deserialize without losing data', function () {
-      const obj = {
+      const obj: Btp.BtpPacket = {
         type: Btp.TYPE_TRANSFER,
         requestId: 1,
         data: {
@@ -113,7 +111,7 @@ describe('BTP/1.0', () => {
 
   describe('serializeTransfer', () => {
     it('should serialize without losing data', function () {
-      const buf = Btp.serializeTransfer({ amount: 100 }, 1, this.protocolData)
+      const buf = Btp.serializeTransfer({ amount: '100' }, 1, this.protocolData)
       assert.deepEqual(buf, this.buffers.transfer)
     })
   })
