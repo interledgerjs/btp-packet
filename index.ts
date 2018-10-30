@@ -1,6 +1,5 @@
 import { Reader, Writer } from 'oer-utils'
 import dateFormat = require('dateformat')
-import { BigNumber } from 'bignumber.js'
 
 // These constants are increased by 1 for BTP version Alpha
 export enum Type {
@@ -107,7 +106,7 @@ export interface BtpTransfer {
 }
 
 function writeTransfer (writer: Writer, data: BtpTransfer) {
-  writer.writeUInt64(new BigNumber(data.amount))
+  writer.writeUInt64(data.amount)
   writeProtocolData(writer, data.protocolData)
 }
 
