@@ -1,24 +1,30 @@
-'use strict'
-
-const { Reader, Writer } = require('oer-utils')
-const dateFormat = require('dateformat')
-const BigNumber = require('bignumber.js')
+import { Reader, Writer } from 'oer-utils'
+import dateFormat = require('dateformat')
+import { BigNumber } from 'bignumber.js'
 
 // These constants are increased by 1 for BTP version Alpha
-const TYPE_RESPONSE = 1
-const TYPE_ERROR = 2
-const TYPE_MESSAGE = 6
-const TYPE_TRANSFER = 7
-const MIME_APPLICATION_OCTET_STREAM = 0
-const MIME_TEXT_PLAIN_UTF8 = 1
-const MIME_APPLICATION_JSON = 2
+export enum Type {
+  TYPE_RESPONSE = 1,
+  TYPE_ERROR = 2,
+  TYPE_MESSAGE = 6,
+  TYPE_TRANSFER = 7
+}
 
-function typeToString (type) {
+export const TYPE_RESPONSE = Type.TYPE_RESPONSE
+export const TYPE_ERROR = Type.TYPE_ERROR
+export const TYPE_MESSAGE = Type.TYPE_MESSAGE
+export const TYPE_TRANSFER = Type.TYPE_TRANSFER
+
+export const MIME_APPLICATION_OCTET_STREAM = 0
+export const MIME_TEXT_PLAIN_UTF8 = 1
+export const MIME_APPLICATION_JSON = 2
+
+export function typeToString (type: Type) {
   switch (type) {
-    case TYPE_RESPONSE: return 'TYPE_RESPONSE'
-    case TYPE_ERROR: return 'TYPE_ERROR'
-    case TYPE_MESSAGE: return 'TYPE_MESSAGE'
-    case TYPE_TRANSFER: return 'TYPE_TRANSFER'
+    case Type.TYPE_RESPONSE: return 'TYPE_RESPONSE'
+    case Type.TYPE_ERROR: return 'TYPE_ERROR'
+    case Type.TYPE_MESSAGE: return 'TYPE_MESSAGE'
+    case Type.TYPE_TRANSFER: return 'TYPE_TRANSFER'
     default: throw new Error('Unrecognized BTP packet type')
   }
 }
@@ -32,18 +38,18 @@ const GENERALIZED_TIME_REGEX =
 // whole BilateralTransferProtocolPacket, see:
 // https://github.com/interledger/rfcs/blob/master/asn1/BilateralTransferProtocol.asn
 
-function base64url (input) {
+export function base64url (input: Buffer) {
   return input.toString('base64')
     .replace(/=/g, '')
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
 }
 
-function toGeneralizedTimeBuffer (date) {
+function toGeneralizedTimeBuffer (date: string) {
   return Buffer.from(dateFormat(date, "UTC:yyyymmddHHMMss.l'Z'"))
 }
 
-function readGeneralizedTime (reader) {
+function readGeneralizedTime (reader: Reader) {
   const generalizedTime = reader.readVarOctetString().toString()
   const date = generalizedTime.replace(
     GENERALIZED_TIME_REGEX,
@@ -52,7 +58,13 @@ function readGeneralizedTime (reader) {
   return new Date(date)
 }
 
-function writeProtocolData (writer, protocolData) {
+export interface ProtocolData {
+  protocolName: string
+  contentType: number
+  data: Buffer
+}
+
+function writeProtocolData (writer: Writer, protocolData: ProtocolData[]) {
   if (!Array.isArray(protocolData)) {
     throw new Error('protocolData must be an array')
   }
@@ -71,7 +83,7 @@ function writeProtocolData (writer, protocolData) {
   }
 }
 
-function readProtocolData (reader) {
+function readProtocolData (reader: Reader) {
   const lengthPrefixPrefix = +reader.readUInt8()
   const lengthPrefix = +reader.readUInt(lengthPrefixPrefix)
   const protocolData = []
@@ -89,12 +101,25 @@ function readProtocolData (reader) {
   return protocolData
 }
 
-function writeTransfer (writer, data) {
+export interface BtpTransfer {
+  amount: string
+  protocolData: ProtocolData[]
+}
+
+function writeTransfer (writer: Writer, data: BtpTransfer) {
   writer.writeUInt64(new BigNumber(data.amount))
   writeProtocolData(writer, data.protocolData)
 }
 
-function writeError (writer, data) {
+export interface BtpError {
+  code: string
+  name: string
+  triggeredAt: string
+  data: string
+  protocolData: ProtocolData[]
+}
+
+function writeError (writer: Writer, data: BtpError) {
   if (data.code.length !== 3) {
     throw new Error(`error code must be 3 characters, got: "${data.code}"`)
   }
@@ -112,19 +137,49 @@ function writeError (writer, data) {
   writeProtocolData(writer, data.protocolData)
 }
 
-function serialize (obj) {
+export interface BtpMessage {
+  protocolData: ProtocolData[]
+}
+
+export interface BtpMessagePacket {
+  type: Type.TYPE_MESSAGE
+  requestId: number
+  data: BtpMessage
+}
+
+export interface BtpResponsePacket {
+  type: Type.TYPE_RESPONSE
+  requestId: number
+  data: BtpMessage
+}
+
+export interface BtpTransferPacket {
+  type: Type.TYPE_TRANSFER
+  requestId: number
+  data: BtpTransfer
+}
+
+export interface BtpErrorPacket {
+  type: Type.TYPE_ERROR
+  requestId: number
+  data: BtpError
+}
+
+export type BtpPacket = BtpResponsePacket | BtpMessagePacket | BtpTransferPacket | BtpErrorPacket
+
+export function serialize (obj: BtpPacket) {
   const contentsWriter = new Writer()
   switch (obj.type) {
-    case TYPE_RESPONSE:
-    case TYPE_MESSAGE:
+    case Type.TYPE_RESPONSE:
+    case Type.TYPE_MESSAGE:
       writeProtocolData(contentsWriter, obj.data.protocolData)
       break
 
-    case TYPE_TRANSFER:
+    case Type.TYPE_TRANSFER:
       writeTransfer(contentsWriter, obj.data)
       break
 
-    case TYPE_ERROR:
+    case Type.TYPE_ERROR:
       writeError(contentsWriter, obj.data)
       break
 
@@ -139,13 +194,13 @@ function serialize (obj) {
   return envelopeWriter.getBuffer()
 }
 
-function readTransfer (reader) {
+function readTransfer (reader: Reader) {
   const amount = reader.readUInt64BigNum().toString(10)
   const protocolData = readProtocolData(reader)
   return { amount, protocolData }
 }
 
-function readError (reader) {
+function readError (reader: Reader) {
   const code = reader.read(3).toString('ascii')
   const name = reader.readVarOctetString().toString('ascii')
   const triggeredAt = readGeneralizedTime(reader)
@@ -155,7 +210,7 @@ function readError (reader) {
   return { code, name, triggeredAt, data, protocolData }
 }
 
-function deserialize (buffer) {
+export function deserialize (buffer: Buffer) {
   const envelopeReader = Reader.from(buffer)
 
   const type = +envelopeReader.readUInt8()
@@ -164,16 +219,16 @@ function deserialize (buffer) {
   const reader = new Reader(dataBuff)
   let data
   switch (type) {
-    case TYPE_RESPONSE:
-    case TYPE_MESSAGE:
+    case Type.TYPE_RESPONSE:
+    case Type.TYPE_MESSAGE:
       data = { protocolData: readProtocolData(reader) }
       break
 
-    case TYPE_TRANSFER:
+    case Type.TYPE_TRANSFER:
       data = readTransfer(reader)
       break
 
-    case TYPE_ERROR:
+    case Type.TYPE_ERROR:
       data = readError(reader)
       break
 
@@ -184,59 +239,53 @@ function deserialize (buffer) {
   return { type, requestId, data }
 }
 
-module.exports = {
-  TYPE_RESPONSE,
-  TYPE_ERROR,
-  TYPE_MESSAGE,
-  TYPE_TRANSFER,
+interface BtpTransferWithoutProtocolData {
+  amount: string
+}
 
-  typeToString,
-  base64url,
+interface BtpErrorWithoutProtocolData {
+  code: string
+  name: string
+  triggeredAt: string
+  data: string
+}
 
-  MIME_APPLICATION_OCTET_STREAM,
-  MIME_TEXT_PLAIN_UTF8,
-  MIME_APPLICATION_JSON,
-
-  serialize,
-  deserialize,
-
-  // The following functions use an alternative format to access the exposed
-  // serialize/deserialize functionality. There is one such serialize* function per BTP call.
-  // The arguments passed to them are aligned with the objects defined in the Ledger-Plugin-Interface (LPI),
-  // which makes these functions convenient to use when working with LPI objects.
-  serializeResponse (requestId, protocolData) {
-    return serialize({
-      type: TYPE_RESPONSE,
-      requestId,
-      data: { protocolData }
-    })
-  },
-  serializeError (error, requestId, protocolData) {
-    let dataFields
-    const { code, name, triggeredAt, data } = error
-    dataFields = { code, name, triggeredAt, data, protocolData }
-    return serialize({
-      type: TYPE_ERROR,
-      requestId,
-      data: dataFields
-    })
-  },
-  serializeMessage (requestId, protocolData) {
-    return serialize({
-      type: TYPE_MESSAGE,
-      requestId,
-      data: { protocolData }
-    })
-  },
-  serializeTransfer (transfer, requestId, protocolData) {
-    const { amount } = transfer
-    return serialize({
-      type: TYPE_TRANSFER,
-      requestId,
-      data: {
-        amount,
-        protocolData
-      }
-    })
-  }
+// The following functions use an alternative format to access the exposed
+// serialize/deserialize functionality. There is one such serialize* function per BTP call.
+// The arguments passed to them are aligned with the objects defined in the Ledger-Plugin-Interface (LPI),
+// which makes these functions convenient to use when working with LPI objects.
+export const serializeResponse = (requestId: number, protocolData: ProtocolData[]) => {
+  return serialize({
+    type: Type.TYPE_RESPONSE,
+    requestId,
+    data: { protocolData }
+  })
+}
+export const serializeError = (error: BtpErrorWithoutProtocolData, requestId: number, protocolData: ProtocolData[]) => {
+  let dataFields
+  const { code, name, triggeredAt, data } = error
+  dataFields = { code, name, triggeredAt, data, protocolData }
+  return serialize({
+    type: Type.TYPE_ERROR,
+    requestId,
+    data: dataFields
+  })
+}
+export const serializeMessage = (requestId: number, protocolData: ProtocolData[]) => {
+  return serialize({
+    type: Type.TYPE_MESSAGE,
+    requestId,
+    data: { protocolData }
+  })
+}
+export const serializeTransfer = (transfer: BtpTransferWithoutProtocolData, requestId: number, protocolData: ProtocolData[]) => {
+  const { amount } = transfer
+  return serialize({
+    type: Type.TYPE_TRANSFER,
+    requestId,
+    data: {
+      amount,
+      protocolData
+    }
+  })
 }

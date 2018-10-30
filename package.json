@@ -2,31 +2,47 @@
   "name": "btp-packet",
   "version": "2.0.0",
   "description": "Codec for Bilateral Transfer Protocol messages",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "typings": "dist/index",
+  "files": "dist",
   "scripts": {
-    "test": "istanbul test -- _mocha",
-    "lint": "eslint ."
+    "lint": "tslint \"src/**/*.ts\" \"test/*.spec.ts\"",
+    "build": "rm -rf dist ; tsc",
+    "test": "npm run build && npm run test:specs",
+    "test:specs": "mocha",
+    "precover": "rm -rf .nyc_output",
+    "cover": "nyc --extension .ts --reporter=text-summary --reporter=html mocha",
+    "codecov": "nyc report --reporter=json && codecov -f coverage/*.json"
   },
-  "author": "Interledger",
+  "author": "Interledger Team <info@interledger.org>",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/interledgerjs/btp-packet.git"
   },
+  "bugs": {
+    "url": "https://github.com/interledgerjs/btp-packet/issues"
+  },
+  "homepage": "https://github.com/interledgerjs/btp-packet#readme",
   "dependencies": {
     "bignumber.js": "^7.2.1",
     "dateformat": "^3.0.3",
+    "long": "^4.0.0",
     "oer-utils": "^3.1.1"
   },
   "devDependencies": {
-    "chai": "^4.1.1",
-    "eslint": "^5.4.0",
-    "eslint-config-standard": "^12.0.0",
-    "eslint-plugin-import": "^2.14.0",
-    "eslint-plugin-node": "^7.0.1",
-    "eslint-plugin-promise": "^4.0.0",
-    "eslint-plugin-standard": "^4.0.0",
-    "istanbul": "^0.4.5",
-    "mocha": "^5.2.0"
+    "@types/chai": "^4.1.4",
+    "@types/dateformat": "^1.0.1",
+    "@types/long": "^4.0.0",
+    "@types/mocha": "^5.2.5",
+    "@types/node": "^10.7.0",
+    "chai": "^4.2.0",
+    "codecov": "^3.0.4",
+    "mocha": "^5.2.0",
+    "nyc": "^13.1.0",
+    "ts-node": "^7.0.1",
+    "tslint": "^5.11.0",
+    "tslint-config-standard": "^8.0.1",
+    "typescript": "^3.0.1"
   }
 }
