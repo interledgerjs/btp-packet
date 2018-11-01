@@ -189,7 +189,7 @@ export function serialize (obj: BtpPacket) {
   const envelopeWriter = new Writer()
   envelopeWriter.writeUInt8(obj.type)
   envelopeWriter.writeUInt32(obj.requestId)
-  envelopeWriter.writeVarOctetString(contentsWriter.getBuffer())
+  envelopeWriter.writeVarOctetString(contentsWriter)
   return envelopeWriter.getBuffer()
 }
 
