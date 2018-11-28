@@ -31,7 +31,11 @@ export function typeToString (type: Type) {
 const GENERALIZED_TIME_REGEX =
   /^([0-9]{4})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2}\.[0-9]{3}Z)$/
 
-const protocolNameCache = createProtocolNameCache([
+const protocolNameCache: {[s: string]: Buffer} = {}
+
+// Generate a cache of the most commonly used BTP subprotocol names.
+// The goal is to avoid an extra buffer allocation when serializing.
+registerProtocolNames([
   'ilp',
   // BTP authentication:
   'auth',
@@ -46,6 +50,13 @@ const protocolNameCache = createProtocolNameCache([
   'last_claim'
 ])
 
+export function registerProtocolNames (names: string[]) {
+  // Cache the most common BTP subprotocol names so that a new buffer doesn't need
+  // to be allocated each serialize().
+  for (const protocolName of names) {
+    protocolNameCache[protocolName] = Buffer.from(protocolName, 'ascii')
+  }
+}
 
 // Notes about variable naming - comparison with asn.1 definition:
 //
@@ -77,18 +88,6 @@ export interface ProtocolData {
   protocolName: string
   contentType: number
   data: Buffer
-}
-
-// Generate a cache of the most commonly used BTP subprotocol names.
-// The goal is to avoid an extra buffer allocation when serializing.
-function createProtocolNameCache (canonProtocolNames: string[]): {[s: string]: Buffer} {
-  // Cache the most common BTP subprotocol names so that a new buffer doesn't need
-  // to be allocated each serialize().
-  const cache = {}
-  for (const protocolName of canonProtocolNames) {
-    cache[protocolName] = Buffer.from(protocolName, 'ascii')
-  }
-  return cache
 }
 
 function writeProtocolData (writer: WriterInterface, protocolData: ProtocolData[]) {
