@@ -1,4 +1,4 @@
-import { Reader, Writer } from 'oer-utils'
+import { Predictor, Reader, Writer, WriterInterface } from 'oer-utils'
 import dateFormat = require('dateformat')
 
 // These constants are increased by 1 for BTP version Alpha
@@ -30,6 +30,33 @@ export function typeToString (type: Type) {
 
 const GENERALIZED_TIME_REGEX =
   /^([0-9]{4})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2}\.[0-9]{3}Z)$/
+
+const protocolNameCache: {[s: string]: Buffer} = {}
+
+// Generate a cache of the most commonly used BTP subprotocol names.
+// The goal is to avoid an extra buffer allocation when serializing.
+registerProtocolNames([
+  'ilp',
+  // BTP authentication:
+  'auth',
+  'auth_username',
+  'auth_token',
+  // ilp-plugin-xrp-asym-{client,server}:
+  'channel',
+  'channel_signature',
+  'claim',
+  'fund_channel',
+  'info',
+  'last_claim'
+])
+
+export function registerProtocolNames (names: string[]) {
+  // Cache the most common BTP subprotocol names so that a new buffer doesn't need
+  // to be allocated each serialize().
+  for (const protocolName of names) {
+    protocolNameCache[protocolName] = Buffer.from(protocolName, 'ascii')
+  }
+}
 
 // Notes about variable naming - comparison with asn.1 definition:
 //
@@ -63,7 +90,7 @@ export interface ProtocolData {
   data: Buffer
 }
 
-function writeProtocolData (writer: Writer, protocolData: ProtocolData[]) {
+function writeProtocolData (writer: WriterInterface, protocolData: ProtocolData[]) {
   if (!Array.isArray(protocolData)) {
     throw new Error('protocolData must be an array')
   }
@@ -76,7 +103,9 @@ function writeProtocolData (writer: Writer, protocolData: ProtocolData[]) {
   writer.writeUInt(lengthPrefix, lengthPrefixLengthPrefix)
 
   for (const p of protocolData) {
-    writer.writeVarOctetString(Buffer.from(p.protocolName, 'ascii'))
+    writer.writeVarOctetString(
+      protocolNameCache[p.protocolName] ||
+      Buffer.from(p.protocolName, 'ascii'))
     writer.writeUInt8(p.contentType)
     writer.writeVarOctetString(p.data)
   }
@@ -105,7 +134,7 @@ export interface BtpTransfer {
   protocolData: ProtocolData[]
 }
 
-function writeTransfer (writer: Writer, data: BtpTransfer) {
+function writeTransfer (writer: WriterInterface, data: BtpTransfer) {
   writer.writeUInt64(data.amount)
   writeProtocolData(writer, data.protocolData)
 }
@@ -118,7 +147,7 @@ export interface BtpError {
   protocolData: ProtocolData[]
 }
 
-function writeError (writer: Writer, data: BtpError) {
+function writeError (writer: WriterInterface, data: BtpError) {
   if (data.code.length !== 3) {
     throw new Error(`error code must be 3 characters, got: "${data.code}"`)
   }
@@ -166,34 +195,38 @@ export interface BtpErrorPacket {
 
 export type BtpPacket = BtpResponsePacket | BtpMessagePacket | BtpTransferPacket | BtpErrorPacket
 
-export function serialize (obj: BtpPacket) {
-  const contentsWriter = new Writer()
+function writeContents (writer: WriterInterface, obj: BtpPacket) {
   switch (obj.type) {
     case Type.TYPE_RESPONSE:
     case Type.TYPE_MESSAGE:
-      writeProtocolData(contentsWriter, obj.data.protocolData)
+      writeProtocolData(writer, obj.data.protocolData)
       break
-
     case Type.TYPE_TRANSFER:
-      writeTransfer(contentsWriter, obj.data)
+      writeTransfer(writer, obj.data)
       break
-
     case Type.TYPE_ERROR:
-      writeError(contentsWriter, obj.data)
+      writeError(writer, obj.data)
       break
-
     default:
       throw new Error('Unrecognized type')
   }
+}
 
-  const envelopeWriter = new Writer()
+export function serialize (obj: BtpPacket): Buffer {
+  const contentsPredictor = new Predictor()
+  writeContents(contentsPredictor, obj)
+  const envelopeSize = 1 + 4 +
+    Predictor.measureVarOctetString(contentsPredictor.length)
+
+  const envelopeWriter = new Writer(envelopeSize)
   envelopeWriter.writeUInt8(obj.type)
   envelopeWriter.writeUInt32(obj.requestId)
-  envelopeWriter.writeVarOctetString(contentsWriter)
+  const contentsWriter = envelopeWriter.createVarOctetString(contentsPredictor.length)
+  writeContents(contentsWriter, obj)
   return envelopeWriter.getBuffer()
 }
 
-function readTransfer (reader: Reader) {
+function readTransfer (reader: Reader): BtpTransfer {
   const amount = reader.readUInt64BigNum().toString(10)
   const protocolData = readProtocolData(reader)
   return { amount, protocolData }

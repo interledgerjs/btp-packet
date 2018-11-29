@@ -115,4 +115,13 @@ describe('BTP/1.0', () => {
       assert.deepEqual(buf, this.buffers.transfer)
     })
   })
+
+  describe('registerProtocolNames', function () {
+    it('caches the protocol names', function () {
+      Btp.registerProtocolNames(
+        this.protocolData.map((protocol: Btp.ProtocolData) => protocol.protocolName))
+      const buf = Btp.serializeMessage(1, this.protocolData)
+      assert.deepEqual(buf, this.buffers.message)
+    })
+  })
 })
