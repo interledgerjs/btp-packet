@@ -227,7 +227,7 @@ export function serialize (obj: BtpPacket): Buffer {
 }
 
 function readTransfer (reader: Reader): BtpTransfer {
-  const amount = reader.readUInt64BigNum().toString(10)
+  const amount = reader.readUInt64()
   const protocolData = readProtocolData(reader)
   return { amount, protocolData }
 }
