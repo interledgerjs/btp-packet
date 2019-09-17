@@ -29,7 +29,7 @@
     "oer-utils": "^5.0.0"
   },
   "devDependencies": {
-    "@types/chai": "^4.1.4",
+    "@types/chai": "^4.2.3",
     "@types/dateformat": "^1.0.1",
     "@types/long": "^4.0.0",
     "@types/mocha": "^5.2.5",
